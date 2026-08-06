@@ -20,6 +20,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CloudKeeperSN.Application.T
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CloudKeeperSN.Infrastructure.Tests", "tests\CloudKeeperSN.Infrastructure.Tests\CloudKeeperSN.Infrastructure.Tests.csproj", "{4AF27689-4A67-494D-9B41-0C8235776109}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CloudKeeperSN.App.Tests", "tests\CloudKeeperSN.App.Tests\CloudKeeperSN.App.Tests.csproj", "{55A3879A-5B78-4A5E-8C52-1D9346887210}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,6 +64,9 @@ Global
 		{4AF27689-4A67-494D-9B41-0C8235776109}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4AF27689-4A67-494D-9B41-0C8235776109}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4AF27689-4A67-494D-9B41-0C8235776109}.Release|Any CPU.Build.0 = Release|Any CPU
+		{55A3879A-5B78-4A5E-8C52-1D9346887210}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{55A3879A-5B78-4A5E-8C52-1D9346887210}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{55A3879A-5B78-4A5E-8C52-1D9346887210}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{55A3879A-5B78-4A5E-8C52-1D9346887210}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
-

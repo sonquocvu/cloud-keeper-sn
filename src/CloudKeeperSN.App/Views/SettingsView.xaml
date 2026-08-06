@@ -1,0 +1,42 @@
+<UserControl x:Class="CloudKeeperSN.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+             xmlns:controls="clr-namespace:CloudKeeperSN.App.Controls">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="{StaticResource PagePadding}" MaxWidth="980">
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Giao diện" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
+                    <TextBlock Text="Thay đổi được áp dụng ngay và được ghi nhớ cho lần mở sau." Style="{StaticResource SupportingText}" Margin="0,4,0,14"/>
+                    <ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme}" DisplayMemberPath="VietnameseLabel" Width="280" HorizontalAlignment="Left" automation:AutomationProperties.Name="Chọn giao diện"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Truyền dữ liệu" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
+                    <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="180"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Số tệp truyền đồng thời" Style="{StaticResource CardTitleText}"/><TextBlock Text="Từ 1 đến 8. Giá trị thấp giúp giảm áp lực bộ nhớ và giới hạn dịch vụ." Style="{StaticResource CaptionText}" Margin="0,3,12,0"/></StackPanel><TextBox Grid.Column="1" Text="{Binding ConcurrentTransfers, UpdateSourceTrigger=PropertyChanged}" automation:AutomationProperties.Name="Số tệp truyền đồng thời"/></Grid>
+                    <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="180"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Giới hạn lưu tạm (MB)" Style="{StaticResource CardTitleText}"/><TextBlock Text="Từ 128 đến 8192 MB. Dữ liệu tạm được xóa sau khi truyền thành công." Style="{StaticResource CaptionText}" Margin="0,3,12,0"/></StackPanel><TextBox Grid.Column="1" Text="{Binding CacheLimitMiB, UpdateSourceTrigger=PropertyChanged}" automation:AutomationProperties.Name="Giới hạn lưu tạm theo MB"/></Grid>
+                    <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="180"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Số lần thử lại tối đa" Style="{StaticResource CardTitleText}"/><TextBlock Text="Từ 1 đến 10. Thời gian chờ tăng dần và tôn trọng giới hạn của dịch vụ." Style="{StaticResource CaptionText}" Margin="0,3,12,0"/></StackPanel><TextBox Grid.Column="1" Text="{Binding RetryAttempts, UpdateSourceTrigger=PropertyChanged}" automation:AutomationProperties.Name="Số lần thử lại tối đa"/></Grid>
+                    <TextBlock Text="{Binding ValidationMessage}" Foreground="{DynamicResource Error}" Margin="0,12,0,0"/>
+                    <Button Content="Lưu cài đặt truyền dữ liệu" Command="{Binding SaveTransferSettingsCommand}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" Margin="0,14,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Dữ liệu cục bộ" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
+                    <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="Cơ sở dữ liệu" Style="{StaticResource CardTitleText}"/><TextBlock Grid.Column="1" Text="{Binding DatabasePath}" Style="{StaticResource SupportingText}" TextTrimming="CharacterEllipsis"/></Grid>
+                    <Grid Margin="0,10,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="Nhật ký" Style="{StaticResource CardTitleText}"/><TextBlock Grid.Column="1" Text="{Binding LogPath}" Style="{StaticResource SupportingText}" TextTrimming="CharacterEllipsis"/></Grid>
+                    <Grid Margin="0,10,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="Bộ nhớ tạm" Style="{StaticResource CardTitleText}"/><TextBlock Grid.Column="1" Text="{Binding CachePath}" Style="{StaticResource SupportingText}" TextTrimming="CharacterEllipsis"/></Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0"><Button Content="Xóa bộ nhớ tạm" Command="{Binding ClearCacheCommand}" ToolTip="Chỉ xóa tệp tạm của CloudKeeperSN"/><Button Content="Xuất thông tin chẩn đoán" Command="{Binding ExportDiagnosticsCommand}" Margin="8,0,0,0" ToolTip="Token và thông tin nhạy cảm sẽ được ẩn"/></StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Ứng dụng" Style="{StaticResource SectionTitleText}"/><TextBlock Text="CloudKeeperSN — Bảo vệ dữ liệu đám mây" Style="{StaticResource SupportingText}" Margin="0,6,0,0"/><TextBlock Text="Giấy phép của các thư viện mã nguồn mở được cung cấp cùng gói phát hành." Style="{StaticResource CaptionText}" Margin="0,4,0,0"/></StackPanel><StackPanel Grid.Column="1" HorizontalAlignment="Right"><TextBlock Text="{Binding Version, StringFormat=Phiên bản {0}}" FontWeight="SemiBold"/><TextBlock Text="{Binding BuildInformation}" Style="{StaticResource CaptionText}" Margin="0,4,0,0"/></StackPanel></Grid>
+            </Border>
+            <TextBlock Text="{Binding ActionMessage}" Foreground="{DynamicResource Success}" Margin="4,14,4,0" TextWrapping="Wrap"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

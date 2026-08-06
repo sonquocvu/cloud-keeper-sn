@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document describes Checkpoint 1. Real Google Drive and Microsoft Graph adapters are intentionally absent.
+This document describes the domain foundation and the fake-provider UI showcase. Real Google Drive and Microsoft Graph adapters are intentionally absent.
 
 ## Dependency direction
 
@@ -56,4 +56,10 @@ No Google or Microsoft SDK dependency is added before its provider checkpoint.
 
 ## UI
 
-The WPF application uses a small in-house `INotifyPropertyChanged`/`ICommand` foundation to avoid an unnecessary MVVM package. All visible strings are Vietnamese. The current dashboard reads account metadata from SQLite; actions requiring real provider connections are disabled.
+The WPF application uses a lightweight internal `INotifyPropertyChanged`/`ICommand` foundation. `MainWindowViewModel` owns navigation and page view models own workflow state. Views contain presentation only; code-behind is limited to dialog results and window placement.
+
+Semantic resource dictionaries provide light/dark themes, typography, spacing, and standard control states. `ThemeService` persists the preference in SQLite and swaps only the theme dictionary. `WindowPlacementService` persists bounds; `WindowPlacementValidator` restores off-screen windows to the visible desktop.
+
+`DemoDataService`, `DemoBackupPlanner`, and `DemoTransferEngine` are UI-development adapters around the existing fake providers. They are explicitly gated by `DemoConfiguration`, use deterministic scenarios, and never masquerade as live provider data. The guided workflow requires a preview and confirmation before the fake engine starts.
+
+UI-facing statuses are mapped to natural Vietnamese by `VietnamesePresentationMapper`; internal enum names never need to appear in views. Diagnostic export redacts sensitive values before serialization.

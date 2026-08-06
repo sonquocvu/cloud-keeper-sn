@@ -17,6 +17,7 @@ Tests do not launch WPF or require live accounts.
 - `CloudKeeperSN.Domain.Tests`: path preservation, OneDrive normalization/reserved names, deterministic conflict naming, Google-native exports, checksums, retry/`Retry-After`, state transitions, pause/resume, redaction, and cycle identity.
 - `CloudKeeperSN.Application.Tests`: fake-source scanning, duplicate Google names, shortcut/folder cycle behavior, cancellation, incremental decisions, and chunked fake OneDrive uploads without overwrite.
 - `CloudKeeperSN.Infrastructure.Tests`: SQLite migrations, stable identity mapping, crash recovery, and redaction before activity persistence.
+- `CloudKeeperSN.App.Tests`: navigation, disconnected states, backup enablement/validation, preview counts and filtering, confirmation safety text, pause/resume/cancel/retry, Vietnamese state mapping, result severity, theme persistence, settings validation, window restoration, demo determinism, and async-command disposal.
 
 SQLite tests use a unique directory under the OS temporary directory and remove it after each test instance.
 
@@ -26,5 +27,4 @@ None exist in Checkpoint 1. Later integration tests must live separately, requir
 
 ## Manual checks deferred
 
-No interactive GUI smoke test was launched, per the delivery rules. Once a .NET 10-capable developer machine is available, a developer may manually verify navigation, Vietnamese text rendering, DPI scaling, and `%LOCALAPPDATA%\CloudKeeperSN` creation.
-
+No interactive GUI smoke test or screenshot comparison is launched by the automated suite. Manually verify Vietnamese rendering, light/dark/system themes, keyboard navigation, dialogs, collapsed navigation, 100%/125%/150% scaling, and `%LOCALAPPDATA%\CloudKeeperSN` behavior on Windows.

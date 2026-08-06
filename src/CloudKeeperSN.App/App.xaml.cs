@@ -4,6 +4,10 @@ using CloudKeeperSN.Application.Persistence;
 using CloudKeeperSN.Application.Recovery;
 using CloudKeeperSN.Application.Storage;
 using CloudKeeperSN.App.ViewModels;
+using CloudKeeperSN.App.UI.Theming;
+using CloudKeeperSN.App.UI.Windowing;
+using CloudKeeperSN.App.Development;
+using CloudKeeperSN.App.Services;
 using CloudKeeperSN.Infrastructure;
 using CloudKeeperSN.Providers.GoogleDrive.Fakes;
 using CloudKeeperSN.Providers.OneDrive.Fakes;
@@ -26,12 +30,37 @@ public partial class App : System.Windows.Application
 
         var services = new ServiceCollection();
         services.AddCloudKeeperInfrastructure(Path.Combine(localData, "cloudkeeper.db"));
+        services.AddSingleton(DemoConfiguration.FromEnvironment());
+        services.AddSingleton<DemoWorkspace>();
         services.AddSingleton<FakeGoogleDriveProvider>();
         services.AddSingleton<FakeOneDriveProvider>();
         services.AddSingleton<IStorageProvider>(provider => provider.GetRequiredService<FakeGoogleDriveProvider>());
         services.AddSingleton<IStorageProvider>(provider => provider.GetRequiredService<FakeOneDriveProvider>());
+        services.AddSingleton<DemoDataService>();
+        services.AddSingleton<DemoBackupPlanner>();
+        services.AddSingleton<IDemoDelay, DemoDelay>();
+        services.AddSingleton<DemoTransferEngine>();
+        services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<IFolderPickerService, FolderPickerService>();
+        services.AddSingleton<IDiagnosticExportService, DiagnosticExportService>();
+        services.AddSingleton<ILocalDataService, LocalDataService>();
         services.AddSingleton<TransferRecoveryService>();
-        services.AddSingleton<MainWindowViewModel>();
+        services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<IWindowPlacementService, WindowPlacementService>();
+        services.AddSingleton<DashboardViewModel>();
+        services.AddSingleton<AccountsViewModel>();
+        services.AddSingleton<BackupViewModel>();
+        services.AddSingleton<HistoryViewModel>();
+        services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton(provider => new MainWindowViewModel(
+            provider.GetRequiredService<DashboardViewModel>(),
+            provider.GetRequiredService<AccountsViewModel>(),
+            provider.GetRequiredService<BackupViewModel>(),
+            provider.GetRequiredService<HistoryViewModel>(),
+            provider.GetRequiredService<SettingsViewModel>())
+        {
+            IsDemoMode = provider.GetRequiredService<DemoConfiguration>().IsEnabled
+        });
         services.AddSingleton<MainWindow>();
         _serviceProvider = services.BuildServiceProvider(validateScopes: true);
 
@@ -39,6 +68,8 @@ public partial class App : System.Windows.Application
         {
             await _serviceProvider.GetRequiredService<IApplicationDatabase>().InitializeAsync(CancellationToken.None);
             await _serviceProvider.GetRequiredService<TransferRecoveryService>().RecoverAsync(CancellationToken.None);
+            await _serviceProvider.GetRequiredService<IThemeService>().InitializeAsync(CancellationToken.None);
+            await _serviceProvider.GetRequiredService<DemoDataService>().InitializeAsync(CancellationToken.None);
             var window = _serviceProvider.GetRequiredService<MainWindow>();
             MainWindow = window;
             window.Show();
@@ -61,4 +92,3 @@ public partial class App : System.Windows.Application
         base.OnExit(e);
     }
 }
-

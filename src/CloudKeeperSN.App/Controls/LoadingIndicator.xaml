@@ -1,0 +1,6 @@
+<UserControl x:Class="CloudKeeperSN.App.Controls.LoadingIndicator" x:Name="Root" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+        <ProgressBar Width="90" IsIndeterminate="True" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding Message, ElementName=Root}" Style="{StaticResource SupportingText}" Margin="12,0,0,0" VerticalAlignment="Center" />
+    </StackPanel>
+</UserControl>

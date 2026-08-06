@@ -1,0 +1,35 @@
+<UserControl x:Class="CloudKeeperSN.App.Controls.StatusBadge"
+             x:Name="Root"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:presentation="clr-namespace:CloudKeeperSN.App.Presentation">
+    <Border x:Name="BadgeBorder" Padding="9,4" CornerRadius="12">
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="●" FontSize="9" VerticalAlignment="Center" Margin="0,0,6,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Tone, ElementName=Root}" Value="{x:Static presentation:StatusTone.Information}"><Setter Property="Foreground" Value="{DynamicResource Information}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Tone, ElementName=Root}" Value="{x:Static presentation:StatusTone.Success}"><Setter Property="Foreground" Value="{DynamicResource Success}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Tone, ElementName=Root}" Value="{x:Static presentation:StatusTone.Warning}"><Setter Property="Foreground" Value="{DynamicResource Warning}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Tone, ElementName=Root}" Value="{x:Static presentation:StatusTone.Error}"><Setter Property="Foreground" Value="{DynamicResource Error}" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{Binding Text, ElementName=Root}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" />
+        </StackPanel>
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Tone, ElementName=Root}" Value="{x:Static presentation:StatusTone.Information}"><Setter Property="Background" Value="{DynamicResource InformationSoft}" /></DataTrigger>
+                    <DataTrigger Binding="{Binding Tone, ElementName=Root}" Value="{x:Static presentation:StatusTone.Success}"><Setter Property="Background" Value="{DynamicResource SuccessSoft}" /></DataTrigger>
+                    <DataTrigger Binding="{Binding Tone, ElementName=Root}" Value="{x:Static presentation:StatusTone.Warning}"><Setter Property="Background" Value="{DynamicResource WarningSoft}" /></DataTrigger>
+                    <DataTrigger Binding="{Binding Tone, ElementName=Root}" Value="{x:Static presentation:StatusTone.Error}"><Setter Property="Background" Value="{DynamicResource ErrorSoft}" /></DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
+    </Border>
+</UserControl>

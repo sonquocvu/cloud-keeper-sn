@@ -1,131 +1,115 @@
 <Window x:Class="CloudKeeperSN.App.MainWindow"
+        x:Name="ShellWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CloudKeeperSN — Sao lưu một chiều"
-        Width="1180" Height="760" MinWidth="960" MinHeight="640"
-        WindowStartupLocation="CenterScreen">
-    <Grid>
+        xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+        xmlns:converters="clr-namespace:CloudKeeperSN.App.UI.Converters"
+        Title="CloudKeeperSN — Bảo vệ dữ liệu đám mây"
+        Icon="Assets/CloudKeeperSN.ico"
+        Width="1280" Height="800" MinWidth="1100" MinHeight="700"
+        WindowStartupLocation="Manual"
+        UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <Window.Resources>
+        <converters:NavigationWidthConverter x:Key="NavigationWidthConverter" />
+        <converters:CompactVisibilityConverter x:Key="CompactVisibilityConverter" />
+        <Style x:Key="NavigationButton" TargetType="Button">
+            <Setter Property="MinHeight" Value="48" />
+            <Setter Property="Margin" Value="10,2" />
+            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource NavigationText}" />
+            <Setter Property="ToolTip" Value="{Binding ToolTip}" />
+            <Setter Property="automation:AutomationProperties.Name" Value="{Binding ToolTip}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="NavBorder" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource NavigationHover}" /></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="NavBorder" Property="Opacity" Value="0.78" /></Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True"><Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource NavigationSelected}" /></DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="{DynamicResource BackgroundPrimary}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="230" />
+            <ColumnDefinition Width="{Binding ActualWidth, ElementName=ShellWindow, Converter={StaticResource NavigationWidthConverter}}" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Background="#173464">
+        <Border Grid.Column="0" Background="{DynamicResource NavigationBackground}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <StackPanel Margin="22,24,18,22">
-                    <TextBlock Text="CloudKeeperSN" Foreground="White" FontSize="22" FontWeight="SemiBold" />
-                    <TextBlock Text="Giữ dữ liệu đám mây an toàn" Foreground="#ADC4EF" Margin="0,5,0,0" FontSize="12" />
+
+                <Grid Margin="20,24,16,22">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="40" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Border Width="36" Height="36" CornerRadius="10" Background="#F3F7FC" Padding="3">
+                        <Image Source="Assets/CloudKeeperSN-icon.png" Stretch="Uniform"
+                               automation:AutomationProperties.Name="Biểu tượng CloudKeeperSN" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0"
+                                Visibility="{Binding ActualWidth, ElementName=ShellWindow, Converter={StaticResource CompactVisibilityConverter}, ConverterParameter=Expanded}">
+                        <TextBlock Text="CloudKeeperSN" Style="{StaticResource ApplicationTitleText}" Foreground="{DynamicResource NavigationText}" />
+                        <TextBlock Text="Bảo vệ dữ liệu đám mây" Style="{StaticResource CaptionText}" Foreground="{DynamicResource NavigationTextMuted}" />
+                    </StackPanel>
+                </Grid>
+
+                <ItemsControl Grid.Row="1" ItemsSource="{Binding NavigationItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource NavigationButton}" Command="{Binding DataContext.NavigateCommand, ElementName=ShellWindow}" CommandParameter="{Binding}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding IconGlyph}" FontFamily="Segoe Fluent Icons" FontSize="17" Foreground="{DynamicResource NavigationText}" HorizontalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Title}" Margin="10,0,0,0" Foreground="{DynamicResource NavigationText}" FontWeight="SemiBold"
+                                               Visibility="{Binding ActualWidth, ElementName=ShellWindow, Converter={StaticResource CompactVisibilityConverter}, ConverterParameter=Expanded}" />
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <StackPanel Grid.Row="2" Margin="16,12,16,18">
+                    <Border Padding="10,7" CornerRadius="7" Background="{DynamicResource NavigationHover}">
+                        <TextBlock Text="{Binding EnvironmentLabel}" Style="{StaticResource CaptionText}" Foreground="{DynamicResource NavigationText}" TextAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="{Binding VersionLabel}" Style="{StaticResource CaptionText}" Foreground="{DynamicResource NavigationTextMuted}" HorizontalAlignment="Center" Margin="0,8,0,0" />
                 </StackPanel>
-                <StackPanel Grid.Row="1">
-                    <Button Content="Tổng quan" Style="{StaticResource NavButtonStyle}" Command="{Binding NavigateCommand}" CommandParameter="dashboard" />
-                    <Button Content="Tài khoản" Style="{StaticResource NavButtonStyle}" Command="{Binding NavigateCommand}" CommandParameter="accounts" />
-                    <Button Content="Sao lưu" Style="{StaticResource NavButtonStyle}" Command="{Binding NavigateCommand}" CommandParameter="backup" />
-                    <Button Content="Lịch sử" Style="{StaticResource NavButtonStyle}" Command="{Binding NavigateCommand}" CommandParameter="history" />
-                    <Button Content="Cài đặt" Style="{StaticResource NavButtonStyle}" Command="{Binding NavigateCommand}" CommandParameter="settings" />
-                </StackPanel>
-                <Border Grid.Row="2" Margin="16" Padding="12" Background="#224477" CornerRadius="8">
-                    <TextBlock Text="Bản nền tảng • Chưa truyền dữ liệu thật" Foreground="#DDE7FF" TextWrapping="Wrap" FontSize="12" />
-                </Border>
             </Grid>
         </Border>
 
-        <Grid Grid.Column="1" Margin="34,28">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Border Background="{DynamicResource SurfacePrimary}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1" Padding="32,20">
+                <StackPanel>
+                    <TextBlock Text="{Binding CurrentPageTitle}" Style="{StaticResource PageTitleText}" automation:AutomationProperties.HeadingLevel="Level1" />
+                    <TextBlock Text="{Binding CurrentPageSubtitle}" Style="{StaticResource SupportingText}" Margin="0,4,0,0" />
+                </StackPanel>
+            </Border>
+            <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" Focusable="False" />
+            <Border Grid.Row="2" Background="{DynamicResource SurfacePrimary}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,1,0,0" Padding="20,8">
                 <Grid>
-                    <StackPanel Visibility="{Binding IsDashboard, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Tổng quan" FontSize="28" FontWeight="SemiBold" />
-                        <TextBlock Text="Theo dõi trạng thái sao lưu một chiều của bạn." Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,24" />
-                        <UniformGrid Columns="2">
-                            <Border Style="{StaticResource CardStyle}">
-                                <StackPanel><TextBlock Text="Google Drive" Foreground="{StaticResource MutedTextBrush}"/><TextBlock Text="{Binding GoogleStatus}" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,0"/></StackPanel>
-                            </Border>
-                            <Border Style="{StaticResource CardStyle}">
-                                <StackPanel><TextBlock Text="OneDrive" Foreground="{StaticResource MutedTextBrush}"/><TextBlock Text="{Binding OneDriveStatus}" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,0"/></StackPanel>
-                            </Border>
-                            <Border Style="{StaticResource CardStyle}">
-                                <StackPanel><TextBlock Text="Lần sao lưu gần nhất" Foreground="{StaticResource MutedTextBrush}"/><TextBlock Text="{Binding LastBackup}" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0"/></StackPanel>
-                            </Border>
-                            <Border Style="{StaticResource CardStyle}">
-                                <StackPanel><TextBlock Text="Tổng số file đã sao lưu" Foreground="{StaticResource MutedTextBrush}"/><TextBlock Text="{Binding TotalFiles}" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,0"/></StackPanel>
-                            </Border>
-                            <Border Style="{StaticResource CardStyle}">
-                                <StackPanel><TextBlock Text="Lỗi đang chờ xử lý" Foreground="{StaticResource MutedTextBrush}"/><TextBlock Text="{Binding PendingErrors}" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,0"/></StackPanel>
-                            </Border>
-                            <Border Style="{StaticResource CardStyle}">
-                                <StackPanel><TextBlock Text="Dung lượng đã truyền" Foreground="{StaticResource MutedTextBrush}"/><TextBlock Text="{Binding TransferredSize}" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,0"/></StackPanel>
-                            </Border>
-                        </UniformGrid>
-                        <Border Style="{StaticResource CardStyle}" Margin="0,8,14,0">
-                            <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
-                        </Border>
-                    </StackPanel>
-
-                    <StackPanel Visibility="{Binding IsAccounts, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Tài khoản" FontSize="28" FontWeight="SemiBold" />
-                        <TextBlock Text="Quản lý kết nối tới các dịch vụ lưu trữ." Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,24" />
-                        <Border Style="{StaticResource CardStyle}">
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel><TextBlock Text="Google Drive" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="Quyền chỉ đọc • Chưa thiết lập kết nối an toàn" Foreground="{StaticResource MutedTextBrush}" Margin="0,5,0,0"/></StackPanel>
-                                <Button Grid.Column="1" Content="Kết nối" IsEnabled="False" Style="{StaticResource PrimaryButtonStyle}" />
-                            </Grid>
-                        </Border>
-                        <Border Style="{StaticResource CardStyle}">
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel><TextBlock Text="OneDrive cá nhân" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="Quyền ghi vào đích sao lưu • Chưa thiết lập kết nối an toàn" Foreground="{StaticResource MutedTextBrush}" Margin="0,5,0,0"/></StackPanel>
-                                <Button Grid.Column="1" Content="Kết nối" IsEnabled="False" Style="{StaticResource PrimaryButtonStyle}" />
-                            </Grid>
-                        </Border>
-                        <TextBlock Text="Kết nối tài khoản thật sẽ được bổ sung ở các bước tiếp theo. Ứng dụng không thu thập mật khẩu Google hoặc Microsoft." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <StackPanel Visibility="{Binding IsBackup, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Sao lưu một chiều" FontSize="28" FontWeight="SemiBold" />
-                        <TextBlock Text="Google Drive là nguồn chỉ đọc; OneDrive là đích. Không xóa hoặc ghi đè tệp hiện có." Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,24" TextWrapping="Wrap" />
-                        <Border Style="{StaticResource CardStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Nguồn: Google Drive" FontWeight="SemiBold" />
-                                <TextBlock Text="Thư mục nguồn" Margin="0,14,0,0" />
-                                <TextBox Text="Chưa chọn" IsReadOnly="True" />
-                                <TextBlock Text="Đích: OneDrive" FontWeight="SemiBold" Margin="0,5,0,0" />
-                                <TextBlock Text="Thư mục đích" Margin="0,14,0,0" />
-                                <TextBox Text="Chưa chọn" IsReadOnly="True" />
-                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                    <Button Content="Quét và xem trước" IsEnabled="False" Style="{StaticResource PrimaryButtonStyle}" />
-                                    <Button Content="Bắt đầu sao lưu" IsEnabled="False" Style="{StaticResource PrimaryButtonStyle}" Margin="10,0,0,0" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource CardStyle}">
-                            <StackPanel><TextBlock Text="Bản xem trước" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="Chưa có dữ liệu quét. Không có tệp nào được truyền trước khi bạn xem trước và xác nhận." Foreground="{StaticResource MutedTextBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/></StackPanel>
-                        </Border>
-                    </StackPanel>
-
-                    <StackPanel Visibility="{Binding IsHistory, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Lịch sử" FontSize="28" FontWeight="SemiBold" />
-                        <TextBlock Text="Các lần sao lưu và quyết định xử lý sẽ xuất hiện tại đây." Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,24" />
-                        <Border Style="{StaticResource CardStyle}" Padding="32">
-                            <StackPanel HorizontalAlignment="Center"><TextBlock Text="Chưa có hoạt động sao lưu" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/><TextBlock Text="Lịch sử được lưu cục bộ bằng tiếng Việt." Foreground="{StaticResource MutedTextBrush}" Margin="0,7,0,0"/></StackPanel>
-                        </Border>
-                    </StackPanel>
-
-                    <StackPanel Visibility="{Binding IsSettings, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Cài đặt" FontSize="28" FontWeight="SemiBold" />
-                        <TextBlock Text="Các giá trị an toàn mặc định cho hoạt động sao lưu." Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,24" />
-                        <Border Style="{StaticResource CardStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Số tệp truyền đồng thời" FontWeight="SemiBold"/><TextBlock Text="2 (khuyến nghị ban đầu để giảm áp lực bộ nhớ và giới hạn dịch vụ)" Foreground="{StaticResource MutedTextBrush}" Margin="0,5,0,18"/>
-                                <TextBlock Text="Chính sách khi trùng tên" FontWeight="SemiBold"/><TextBlock Text="Tạo tên an toàn có hậu tố CloudKeeperSN; không ghi đè" Foreground="{StaticResource MutedTextBrush}" Margin="0,5,0,18"/>
-                                <TextBlock Text="Xác minh mặc định" FontWeight="SemiBold"/><TextBlock Text="Dùng bằng chứng tương thích mạnh nhất có sẵn, không tải lại tệp đích" Foreground="{StaticResource MutedTextBrush}" Margin="0,5,0,0"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <TextBlock Text="●" Foreground="{DynamicResource Success}" FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding GlobalStatus}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" />
                 </Grid>
-            </ScrollViewer>
+            </Border>
         </Grid>
     </Grid>
 </Window>
