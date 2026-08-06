@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\CloudKeeperSN.Domain\CloudKeeperSN.Domain.csproj" />
+  </ItemGroup>
+</Project>
+
