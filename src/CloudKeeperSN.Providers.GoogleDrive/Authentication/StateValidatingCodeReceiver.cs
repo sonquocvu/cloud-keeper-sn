@@ -21,7 +21,9 @@ public sealed class GoogleOAuthCallbackException(
 /// <summary>
 /// Adds an unpredictable OAuth state value and rejects callbacks that do not echo it.
 /// </summary>
-public sealed class StateValidatingCodeReceiver(ICodeReceiver inner) : ICodeReceiver
+public sealed class StateValidatingCodeReceiver(
+    ICodeReceiver inner,
+    Func<GoogleOAuthStage, CancellationToken, Task>? reportStageAsync = null) : ICodeReceiver
 {
     public string RedirectUri => inner.RedirectUri;
 
@@ -31,7 +33,9 @@ public sealed class StateValidatingCodeReceiver(ICodeReceiver inner) : ICodeRece
     {
         var expectedState = CreateState();
         url.State = expectedState;
+        await ReportAsync(GoogleOAuthStage.WaitingForCallback, taskCancellationToken);
         var response = await inner.ReceiveCodeAsync(url, taskCancellationToken);
+        await ReportAsync(GoogleOAuthStage.CallbackReceived, taskCancellationToken);
         if (!FixedTimeEquals(expectedState, response.State))
         {
             throw new GoogleOAuthCallbackException(
@@ -39,8 +43,12 @@ public sealed class StateValidatingCodeReceiver(ICodeReceiver inner) : ICodeRece
                 "The OAuth callback state did not match the authorization request.");
         }
 
+        await ReportAsync(GoogleOAuthStage.StateValidated, taskCancellationToken);
         return response;
     }
+
+    private Task ReportAsync(GoogleOAuthStage stage, CancellationToken cancellationToken) =>
+        reportStageAsync?.Invoke(stage, cancellationToken) ?? Task.CompletedTask;
 
     private static string CreateState()
     {

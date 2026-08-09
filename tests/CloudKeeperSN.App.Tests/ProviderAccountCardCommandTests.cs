@@ -1,4 +1,5 @@
 using CloudKeeperSN.App.ViewModels;
+using CloudKeeperSN.App.Services;
 using CloudKeeperSN.Application.Storage;
 using CloudKeeperSN.Domain.Storage;
 
@@ -111,6 +112,80 @@ public sealed class ProviderAccountCardCommandTests
         Assert.Equal("Chưa cấu hình OAuth.", card.ErrorMessage);
     }
 
+    [Fact]
+    public void AuthenticationEventsAreDispatchedAndPublishAccountWithoutReloadingPage()
+    {
+        var authentication = new FakeAuthentication(true,
+            "OAuth đã sẵn sàng (nguồn: Đã nhập từ Cài đặt). Chưa kết nối tài khoản.");
+        var dispatcher = new RecordingDispatcher();
+        using var card = new ProviderAccountCardViewModel(
+            "google-drive", "Google Drive", "Chỉ đọc", "Kết nối Google Drive",
+            true, authentication.ConfigurationMessage, new FakeDialogService(),
+            _ => Task.FromResult<StorageAccount?>(null),
+            _ => Task.FromResult(Account),
+            _ => Task.CompletedTask,
+            authentication,
+            dispatcher);
+        card.Apply(null);
+        var changedProperties = new List<string?>();
+        var connectRequeries = 0;
+        var disconnectRequeries = 0;
+        card.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+        card.ConnectCommand.CanExecuteChanged += (_, _) => connectRequeries++;
+        card.DisconnectCommand.CanExecuteChanged += (_, _) => disconnectRequeries++;
+
+        authentication.Publish(new ProviderAuthenticationState(
+            ProviderAuthenticationStatus.WaitingForCallback,
+            "Đang chờ phản hồi",
+            AttemptId: Guid.NewGuid()));
+        Assert.False(card.ConnectCommand.CanExecute(null));
+        Assert.True(card.CanCancelConnection);
+
+        authentication.Publish(new ProviderAuthenticationState(
+            ProviderAuthenticationStatus.Connected,
+            "Đã kết nối",
+            Account: Account,
+            AttemptId: Guid.NewGuid()));
+
+        Assert.Equal(2, dispatcher.InvocationCount);
+        Assert.Equal(Account.DisplayName, card.AccountName);
+        Assert.Equal(Account.Email, card.Email);
+        Assert.Equal("Đã kết nối Google Drive thành công.", card.SuccessMessage);
+        Assert.Null(card.ConfigurationStatusMessage);
+        Assert.False(card.ConnectCommand.CanExecute(null));
+        Assert.True(card.DisconnectCommand.CanExecute(null));
+        Assert.Contains(nameof(card.AccountName), changedProperties);
+        Assert.Contains(nameof(card.Email), changedProperties);
+        Assert.True(connectRequeries >= 2);
+        Assert.True(disconnectRequeries >= 2);
+    }
+
+    [Fact]
+    public void FailureEventClearsBusyStateAndMakesConnectRetryable()
+    {
+        var authentication = new FakeAuthentication(true, "OAuth đã sẵn sàng.");
+        using var card = new ProviderAccountCardViewModel(
+            "google-drive", "Google Drive", "Chỉ đọc", "Kết nối Google Drive",
+            true, authentication.ConfigurationMessage, new FakeDialogService(),
+            _ => Task.FromResult<StorageAccount?>(null),
+            _ => Task.FromResult(Account),
+            _ => Task.CompletedTask,
+            authentication);
+        card.Apply(null);
+
+        authentication.Publish(new ProviderAuthenticationState(
+            ProviderAuthenticationStatus.ExchangingCode, "Đang trao đổi mã"));
+        Assert.True(card.IsBusy);
+        Assert.False(card.ConnectCommand.CanExecute(null));
+
+        authentication.Publish(new ProviderAuthenticationState(
+            ProviderAuthenticationStatus.Failed, "Không thể kết nối", "RequestTimedOut"));
+
+        Assert.False(card.IsBusy);
+        Assert.True(card.ConnectCommand.CanExecute(null));
+        Assert.False(card.DisconnectCommand.CanExecute(null));
+    }
+
     private static ProviderAccountCardViewModel CreateCard(
         bool configured,
         string? configurationMessage = null,
@@ -139,6 +214,7 @@ public sealed class ProviderAccountCardCommandTests
         private bool _configured;
         private string? _configurationMessage;
         private event Action? ConfigurationChangedHandlers;
+        private event Action<ProviderAuthenticationState>? StateChangedHandlers;
 
         public FakeAuthentication(bool configured, string? configurationMessage)
         {
@@ -151,7 +227,7 @@ public sealed class ProviderAccountCardCommandTests
         public string? ConfigurationMessage => _configurationMessage;
         public ProviderAuthenticationState State { get; private set; } =
             new(ProviderAuthenticationStatus.Disconnected, "Chưa kết nối");
-        public event Action<ProviderAuthenticationState>? StateChanged { add { } remove { } }
+        public event Action<ProviderAuthenticationState>? StateChanged { add => StateChangedHandlers += value; remove => StateChangedHandlers -= value; }
         public event Action? ConfigurationChanged { add => ConfigurationChangedHandlers += value; remove => ConfigurationChangedHandlers -= value; }
         public Task<StorageAccount?> GetCachedAccountAsync(CancellationToken cancellationToken) => Task.FromResult<StorageAccount?>(null);
         public Task<StorageAccount> ConnectAsync(CancellationToken cancellationToken) => Task.FromResult(Account);
@@ -164,5 +240,17 @@ public sealed class ProviderAccountCardCommandTests
             _configurationMessage = message;
             ConfigurationChangedHandlers?.Invoke();
         }
+
+        public void Publish(ProviderAuthenticationState state)
+        {
+            State = state;
+            StateChangedHandlers?.Invoke(state);
+        }
+    }
+
+    private sealed class RecordingDispatcher : IUiDispatcher
+    {
+        public int InvocationCount { get; private set; }
+        public void Invoke(Action action) { InvocationCount++; action(); }
     }
 }

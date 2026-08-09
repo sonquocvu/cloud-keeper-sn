@@ -11,11 +11,16 @@ namespace CloudKeeperSN.Providers.GoogleDrive.Authentication;
 public sealed class GoogleApisOAuthClient : IGoogleOAuthClient, IAsyncDisposable
 {
     private const string UserKey = "current-windows-user";
-    private const string CallbackCompleteHtml = "<html><head><title>CloudKeeperSN</title></head><body>Đăng nhập đã hoàn tất. Bạn có thể đóng cửa sổ này.</body></html>";
-    private static readonly TimeSpan InteractiveAuthorizationTimeout = TimeSpan.FromMinutes(5);
+    private const string CallbackCompleteHtml = """
+        <!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>CloudKeeperSN</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f4f7fb;color:#172033}main{max-width:560px;margin:12vh auto;padding:32px;border:1px solid #d8e0ec;border-radius:16px;background:white;box-shadow:0 12px 36px #1c31551a}h1{font-size:24px;margin-top:0}p{line-height:1.55;color:#475569}</style></head>
+        <body><main><h1 id="title">Đã nhận phản hồi đăng nhập</h1><p id="message">CloudKeeperSN đang trao đổi và xác minh quyền truy cập. Bạn có thể đóng cửa sổ này và quay lại ứng dụng.</p></main>
+        <script>(()=>{const p=new URLSearchParams(location.search),e=p.get('error'),c=p.has('code'),s=p.has('state'),t=document.getElementById('title'),m=document.getElementById('message');if(e){t.textContent=e==='access_denied'?'Đăng nhập đã bị hủy hoặc từ chối':'Google không thể hoàn tất yêu cầu';m.textContent='Bạn có thể đóng cửa sổ này và quay lại CloudKeeperSN để xem hướng dẫn thử lại.';}else if(!c||!s){t.textContent='Phản hồi đăng nhập không hợp lệ';m.textContent='CloudKeeperSN sẽ không sử dụng phản hồi này. Bạn có thể đóng cửa sổ và thử kết nối lại trong ứng dụng.';}})();</script></body></html>
+        """;
+    private static readonly TimeSpan CallbackTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan TokenExchangeTimeout = TimeSpan.FromSeconds(45);
     private readonly GoogleOAuthConfigurationManager _configurationManager;
     private readonly ProtectedGoogleDataStore _dataStore;
-    private GoogleApisDriveSession? _activeSession;
     private int _disposed;
 
     public GoogleApisOAuthClient(GoogleOAuthConfigurationManager configurationManager, IProtectedCredentialStore credentials)
@@ -44,7 +49,7 @@ public sealed class GoogleApisOAuthClient : IGoogleOAuthClient, IAsyncDisposable
 
             var credential = new UserCredential(flow, UserKey, token);
             _ = await credential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
-            return ReplaceSession(new GoogleApisDriveSession(flow, credential));
+            return new GoogleApisDriveSession(flow, credential);
         }
         catch
         {
@@ -53,26 +58,61 @@ public sealed class GoogleApisOAuthClient : IGoogleOAuthClient, IAsyncDisposable
         }
     }
 
-    public async Task<IGoogleDriveSession> AuthorizeAsync(CancellationToken cancellationToken)
+    public async Task<IGoogleDriveSession> AuthorizeAsync(
+        Func<GoogleOAuthStage, CancellationToken, Task> reportStageAsync,
+        CancellationToken cancellationToken)
     {
         EnsureConfigured();
         var flow = CreateFlow();
-        using var authorizationTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        authorizationTimeout.CancelAfter(InteractiveAuthorizationTimeout);
         try
         {
             var receiver = new StateValidatingCodeReceiver(new LocalServerCodeReceiver(
                 CallbackCompleteHtml,
-                LocalServerCodeReceiver.CallbackUriChooserStrategy.ForceLoopbackIp));
-            var installedApp = new AuthorizationCodeInstalledApp(flow, receiver);
-            var credential = await installedApp.AuthorizeAsync(UserKey, authorizationTimeout.Token);
-            return ReplaceSession(new GoogleApisDriveSession(flow, credential));
-        }
-        catch (OperationCanceledException exception) when (
-            authorizationTimeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-        {
-            flow.Dispose();
-            throw new TimeoutException("The Google OAuth callback did not complete within five minutes.", exception);
+                LocalServerCodeReceiver.CallbackUriChooserStrategy.ForceLoopbackIp), reportStageAsync);
+
+            using var callbackTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            callbackTimeout.CancelAfter(CallbackTimeout);
+            AuthorizationCodeResponseUrl response;
+            string codeVerifier;
+            try
+            {
+                var request = flow.CreateAuthorizationCodeRequest(receiver.RedirectUri, out codeVerifier);
+                response = await receiver.ReceiveCodeAsync(request, callbackTimeout.Token);
+            }
+            catch (OperationCanceledException exception) when (
+                callbackTimeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException("The Google OAuth callback did not arrive within five minutes.", exception);
+            }
+
+            if (!string.IsNullOrWhiteSpace(response.Error))
+                throw new TokenResponseException(new TokenErrorResponse(response));
+            if (string.IsNullOrWhiteSpace(response.Code))
+                throw new InvalidDataException("The Google OAuth callback did not contain an authorization code.");
+
+            await reportStageAsync(GoogleOAuthStage.ExchangingCode, cancellationToken);
+            using var exchangeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            exchangeTimeout.CancelAfter(TokenExchangeTimeout);
+            TokenResponse token;
+            try
+            {
+                token = await flow.ExchangeCodeForTokenAsync(
+                    UserKey,
+                    response.Code,
+                    codeVerifier,
+                    receiver.RedirectUri,
+                    exchangeTimeout.Token);
+            }
+            catch (OperationCanceledException exception) when (
+                exchangeTimeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException("The Google OAuth authorization-code exchange timed out.", exception);
+            }
+
+            if (string.IsNullOrWhiteSpace(token.AccessToken))
+                throw new InvalidDataException("Google returned an unusable OAuth token response.");
+            await reportStageAsync(GoogleOAuthStage.AuthorizationStored, cancellationToken);
+            return new GoogleApisDriveSession(flow, new UserCredential(flow, UserKey, token));
         }
         catch
         {
@@ -83,33 +123,13 @@ public sealed class GoogleApisOAuthClient : IGoogleOAuthClient, IAsyncDisposable
 
     public async Task DisconnectAsync(CancellationToken cancellationToken)
     {
-        var session = Interlocked.Exchange(ref _activeSession, null);
-        if (session is not null) await session.DisposeAsync();
-        if (!IsConfigured)
-        {
-            await _dataStore.ClearAsync();
-            return;
-        }
-
-        using var flow = CreateFlow();
-        try
-        {
-            var token = await flow.LoadTokenAsync(UserKey, cancellationToken);
-            var tokenToRevoke = token?.RefreshToken ?? token?.AccessToken;
-            if (!string.IsNullOrWhiteSpace(tokenToRevoke))
-                await flow.RevokeTokenAsync(UserKey, tokenToRevoke, cancellationToken);
-        }
-        finally
-        {
-            await _dataStore.ClearAsync();
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        await _dataStore.ClearAsync();
     }
 
     public async Task ClearLocalAuthorizationAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var session = Interlocked.Exchange(ref _activeSession, null);
-        if (session is not null) await session.DisposeAsync();
         await _dataStore.ClearAsync();
     }
 
@@ -125,13 +145,6 @@ public sealed class GoogleApisOAuthClient : IGoogleOAuthClient, IAsyncDisposable
         Prompt = "select_account"
     });
 
-    private GoogleApisDriveSession ReplaceSession(GoogleApisDriveSession session)
-    {
-        var previous = Interlocked.Exchange(ref _activeSession, session);
-        if (previous is not null) _ = previous.DisposeAsync();
-        return session;
-    }
-
     private void EnsureConfigured()
     {
         if (!IsConfigured)
@@ -144,7 +157,6 @@ public sealed class GoogleApisOAuthClient : IGoogleOAuthClient, IAsyncDisposable
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _configurationManager.Changed -= ConfigurationManagerChanged;
-        var session = Interlocked.Exchange(ref _activeSession, null);
-        if (session is not null) await session.DisposeAsync();
+        await Task.CompletedTask;
     }
 }

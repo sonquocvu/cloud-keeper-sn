@@ -34,6 +34,16 @@ internal sealed class GoogleApisDriveSession : IGoogleDriveSession
         return new GoogleAccountProfile(accountId, user.DisplayName ?? user.EmailAddress ?? "Tài khoản Google", user.EmailAddress);
     }
 
+    public async Task VerifyReadOnlyAccessAsync(CancellationToken cancellationToken)
+    {
+        var request = _service.Files.List();
+        request.Spaces = "drive";
+        request.Corpora = "user";
+        request.PageSize = 1;
+        request.Fields = "files(id)";
+        _ = await _requests.ExecuteAsync(token => request.ExecuteAsync(token), cancellationToken);
+    }
+
     public async Task<GoogleDriveMetadataPage> GetChildrenPageAsync(string parentItemId, string? pageToken, CancellationToken cancellationToken)
     {
         var request = _service.Files.List();

@@ -84,6 +84,7 @@ public sealed class GoogleDriveBrowsingTests
         public List<string?> ReceivedTokens { get; } = [];
         public Task<GoogleAccountProfile> GetAccountProfileAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new GoogleAccountProfile("account", "Tài khoản", "drive@example.test"));
+        public Task VerifyReadOnlyAccessAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<GoogleDriveMetadataPage> GetChildrenPageAsync(string parentItemId, string? pageToken, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -99,7 +100,13 @@ public sealed class GoogleDriveBrowsingTests
         public bool IsConfigured => true;
         public string? ConfigurationMessage => null;
         public Task<IGoogleDriveSession?> RestoreAsync(CancellationToken cancellationToken) => Task.FromResult<IGoogleDriveSession?>(session);
-        public Task<IGoogleDriveSession> AuthorizeAsync(CancellationToken cancellationToken) => Task.FromResult(session);
+        public async Task<IGoogleDriveSession> AuthorizeAsync(
+            Func<GoogleOAuthStage, CancellationToken, Task> reportStageAsync,
+            CancellationToken cancellationToken)
+        {
+            await reportStageAsync(GoogleOAuthStage.AuthorizationStored, cancellationToken);
+            return session;
+        }
         public Task DisconnectAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task ClearLocalAuthorizationAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }

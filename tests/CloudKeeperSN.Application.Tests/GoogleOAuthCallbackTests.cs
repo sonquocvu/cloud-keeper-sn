@@ -12,7 +12,10 @@ public sealed class GoogleOAuthCallbackTests
     [Fact]
     public async Task MatchingStateIsAccepted()
     {
-        var receiver = new StateValidatingCodeReceiver(new FakeCodeReceiver(echoState: true));
+        var stages = new List<GoogleOAuthStage>();
+        var receiver = new StateValidatingCodeReceiver(
+            new FakeCodeReceiver(echoState: true),
+            (stage, _) => { stages.Add(stage); return Task.CompletedTask; });
         var request = new AuthorizationCodeRequestUrl(new Uri("https://accounts.google.com/o/oauth2/v2/auth"));
 
         var response = await receiver.ReceiveCodeAsync(request, CancellationToken.None);
@@ -20,12 +23,19 @@ public sealed class GoogleOAuthCallbackTests
         Assert.False(string.IsNullOrWhiteSpace(request.State));
         Assert.Equal(request.State, response.State);
         Assert.Equal("sample-code", response.Code);
+        Assert.Equal([
+            GoogleOAuthStage.WaitingForCallback,
+            GoogleOAuthStage.CallbackReceived,
+            GoogleOAuthStage.StateValidated], stages);
     }
 
     [Fact]
     public async Task MismatchedStateIsRejectedAndClassifiedSafely()
     {
-        var receiver = new StateValidatingCodeReceiver(new FakeCodeReceiver(echoState: false));
+        var stages = new List<GoogleOAuthStage>();
+        var receiver = new StateValidatingCodeReceiver(
+            new FakeCodeReceiver(echoState: false),
+            (stage, _) => { stages.Add(stage); return Task.CompletedTask; });
         var request = new AuthorizationCodeRequestUrl(new Uri("https://accounts.google.com/o/oauth2/v2/auth"));
 
         var exception = await Assert.ThrowsAsync<GoogleOAuthCallbackException>(
@@ -35,6 +45,9 @@ public sealed class GoogleOAuthCallbackTests
         Assert.Equal(GoogleOAuthCallbackFailure.StateMismatch, exception.Failure);
         Assert.Equal(ProviderFailureCategory.OAuthStateMismatch, mapped.Category);
         Assert.DoesNotContain("sample-code", mapped.Message);
+        Assert.Equal([
+            GoogleOAuthStage.WaitingForCallback,
+            GoogleOAuthStage.CallbackReceived], stages);
     }
 
     [Fact]

@@ -33,8 +33,22 @@ public sealed class GoogleAuthenticationTests
 
         Assert.Equal("permission-42", account.ProviderAccountId);
         Assert.Equal("an@example.test", account.Email);
-        Assert.Equal([ProviderAuthenticationStatus.OpeningBrowser, ProviderAuthenticationStatus.CompletingConnection, ProviderAuthenticationStatus.Connected], states);
+        Assert.Equal([
+            ProviderAuthenticationStatus.OpeningBrowser,
+            ProviderAuthenticationStatus.WaitingForCallback,
+            ProviderAuthenticationStatus.WaitingForCallback,
+            ProviderAuthenticationStatus.WaitingForCallback,
+            ProviderAuthenticationStatus.ExchangingCode,
+            ProviderAuthenticationStatus.ExchangingCode,
+            ProviderAuthenticationStatus.LoadingAccount,
+            ProviderAuthenticationStatus.VerifyingDrive,
+            ProviderAuthenticationStatus.Connected], states);
         Assert.Single(accounts.Values);
+        Assert.Equal(account, service.State.Account);
+        Assert.Equal(1, ((FakeGoogleDriveSession)oauth.AuthorizedSession!).VerificationCalls);
+        Assert.True(
+            diagnostics.Events.FindIndex(entry => entry.EventType == "GoogleOAuthAuthorizationStored") <
+            diagnostics.Events.FindIndex(entry => entry.EventType == "GoogleAccountStatePublished"));
         Assert.Contains(diagnostics.Events, entry => entry.EventType == "GoogleAuthenticationCompleted");
     }
 
@@ -81,7 +95,7 @@ public sealed class GoogleAuthenticationTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => connect);
         Assert.Equal(ProviderAuthenticationStatus.Cancelled, service.State.Status);
-        Assert.Equal(1, oauth.DisconnectCalls);
+        Assert.Equal(1, oauth.ClearLocalCalls);
     }
 
     [Fact]
@@ -96,13 +110,81 @@ public sealed class GoogleAuthenticationTests
 
         Assert.Equal(ProviderFailureCategory.NetworkUnavailable, failure.Category);
         Assert.Equal(ProviderAuthenticationStatus.Failed, service.State.Status);
-        Assert.Equal(1, oauth.DisconnectCalls);
+        Assert.Equal(1, oauth.ClearLocalCalls);
         Assert.Empty(accounts.Values);
 
         session.ProfileException = null;
         var account = await service.ConnectAsync(CancellationToken.None);
         Assert.Equal("permission-42", account.ProviderAccountId);
         Assert.Equal(ProviderAuthenticationStatus.Connected, service.State.Status);
+    }
+
+    [Fact]
+    public async Task FailedDriveVerificationNeverPublishesFalseConnectedStateAndAllowsRetry()
+    {
+        var session = new FakeGoogleDriveSession { VerificationException = new HttpRequestException("offline") };
+        var oauth = new FakeGoogleOAuthClient { AuthorizedSession = session };
+        await using var service = CreateService(oauth, out var accounts, out _);
+
+        var failure = await Assert.ThrowsAsync<ProviderOperationException>(
+            () => service.ConnectAsync(CancellationToken.None));
+
+        Assert.Equal(ProviderFailureCategory.NetworkUnavailable, failure.Category);
+        Assert.Equal(ProviderAuthenticationStatus.Failed, service.State.Status);
+        Assert.Null(service.State.Account);
+        Assert.Empty(accounts.Values);
+        Assert.True(session.IsDisposed);
+
+        oauth.AuthorizedSession = new FakeGoogleDriveSession();
+        var account = await service.ConnectAsync(CancellationToken.None);
+        Assert.Equal("permission-42", account.ProviderAccountId);
+        Assert.Equal(ProviderAuthenticationStatus.Connected, service.State.Status);
+    }
+
+    [Fact]
+    public async Task DiagnosticStorageFailureCannotTurnSuccessfulAuthenticationIntoFailure()
+    {
+        var oauth = new FakeGoogleOAuthClient { AuthorizedSession = new FakeGoogleDriveSession() };
+        var accounts = new MemoryAccountRepository();
+        var diagnostics = new FakeProviderDiagnostics { Exception = new IOException("diagnostic store unavailable") };
+        await using var service = new GoogleAuthenticationService(oauth, accounts, diagnostics);
+
+        var account = await service.ConnectAsync(CancellationToken.None);
+
+        Assert.Equal("permission-42", account.ProviderAccountId);
+        Assert.Equal(ProviderAuthenticationStatus.Connected, service.State.Status);
+        Assert.Single(accounts.Values);
+    }
+
+    [Fact]
+    public async Task LateStartupRestoreCannotOverwriteNewerInteractiveConnection()
+    {
+        var oldSession = new FakeGoogleDriveSession
+        {
+            Profile = new GoogleAccountProfile("old", "Old User", "old@example.test")
+        };
+        var newSession = new FakeGoogleDriveSession
+        {
+            Profile = new GoogleAccountProfile("new", "New User", "new@example.test")
+        };
+        var oauth = new FakeGoogleOAuthClient
+        {
+            RestoredSession = oldSession,
+            AuthorizedSession = newSession,
+            BlockRestore = true
+        };
+        await using var service = CreateService(oauth, out _, out _);
+
+        var restore = service.GetCachedAccountAsync(CancellationToken.None);
+        await oauth.RestoreStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var connected = await service.ConnectAsync(CancellationToken.None);
+        oauth.ReleaseRestore.SetResult();
+        var restoredResult = await restore;
+
+        Assert.Equal("new", connected.ProviderAccountId);
+        Assert.Equal("new", restoredResult!.ProviderAccountId);
+        Assert.Equal("new", service.State.Account!.ProviderAccountId);
+        Assert.True(oldSession.IsDisposed);
     }
 
     [Fact]
@@ -121,7 +203,7 @@ public sealed class GoogleAuthenticationTests
 
         Assert.Equal(ProviderFailureCategory.OAuthAccessDenied, failure.Category);
         Assert.Equal(ProviderAuthenticationStatus.Failed, service.State.Status);
-        Assert.Equal(1, oauth.DisconnectCalls);
+        Assert.Equal(1, oauth.ClearLocalCalls);
         Assert.Empty(accounts.Values);
     }
 
@@ -138,7 +220,7 @@ public sealed class GoogleAuthenticationTests
 
         Assert.Null(account);
         Assert.Equal(ProviderAuthenticationStatus.ReauthenticationRequired, service.State.Status);
-        Assert.Equal(1, oauth.DisconnectCalls);
+        Assert.Equal(1, oauth.ClearLocalCalls);
         Assert.Contains(diagnostics.Events, entry => entry.EventType == "GoogleTokenRestoreFailed");
     }
 
@@ -195,22 +277,33 @@ public sealed class GoogleAuthenticationTests
         public Exception? RestoreException { get; set; }
         public bool BlockAuthorization { get; set; }
         public bool WaitForCancellation { get; set; }
+        public bool BlockRestore { get; set; }
         public Exception? AuthorizeException { get; set; }
         public int DisconnectCalls { get; private set; }
         public int ClearLocalCalls { get; private set; }
         public TaskCompletionSource AuthorizationStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseAuthorization { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource RestoreStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseRestore { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task<IGoogleDriveSession?> RestoreAsync(CancellationToken cancellationToken) => RestoreException is null
-            ? Task.FromResult(RestoredSession)
-            : Task.FromException<IGoogleDriveSession?>(RestoreException);
+        public async Task<IGoogleDriveSession?> RestoreAsync(CancellationToken cancellationToken)
+        {
+            RestoreStarted.TrySetResult();
+            if (BlockRestore) await ReleaseRestore.Task.WaitAsync(cancellationToken);
+            if (RestoreException is not null) throw RestoreException;
+            return RestoredSession;
+        }
 
-        public async Task<IGoogleDriveSession> AuthorizeAsync(CancellationToken cancellationToken)
+        public async Task<IGoogleDriveSession> AuthorizeAsync(
+            Func<GoogleOAuthStage, CancellationToken, Task> reportStageAsync,
+            CancellationToken cancellationToken)
         {
             AuthorizationStarted.TrySetResult();
             if (WaitForCancellation) await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             if (BlockAuthorization) await ReleaseAuthorization.Task.WaitAsync(cancellationToken);
             if (AuthorizeException is not null) throw AuthorizeException;
+            foreach (var stage in Enum.GetValues<GoogleOAuthStage>())
+                await reportStageAsync(stage, cancellationToken);
             return AuthorizedSession!;
         }
 
@@ -232,12 +325,22 @@ public sealed class GoogleAuthenticationTests
     private sealed class FakeGoogleDriveSession : IGoogleDriveSession
     {
         public Exception? ProfileException { get; set; }
+        public Exception? VerificationException { get; set; }
+        public GoogleAccountProfile Profile { get; set; } =
+            new("permission-42", "Nguyễn An", "an@example.test");
+        public int VerificationCalls { get; private set; }
+        public bool IsDisposed { get; private set; }
         public Task<GoogleAccountProfile> GetAccountProfileAsync(CancellationToken cancellationToken) => ProfileException is null
-            ? Task.FromResult(new GoogleAccountProfile("permission-42", "Nguyễn An", "an@example.test"))
+            ? Task.FromResult(Profile)
             : Task.FromException<GoogleAccountProfile>(ProfileException);
+        public Task VerifyReadOnlyAccessAsync(CancellationToken cancellationToken)
+        {
+            VerificationCalls++;
+            return VerificationException is null ? Task.CompletedTask : Task.FromException(VerificationException);
+        }
         public Task<GoogleDriveMetadataPage> GetChildrenPageAsync(string parentItemId, string? pageToken, CancellationToken cancellationToken) =>
             Task.FromResult(new GoogleDriveMetadataPage([], null));
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public ValueTask DisposeAsync() { IsDisposed = true; return ValueTask.CompletedTask; }
     }
 
     private sealed class MemoryAccountRepository : IStorageAccountRepository
@@ -251,8 +354,10 @@ public sealed class GoogleAuthenticationTests
     private sealed class FakeProviderDiagnostics : IProviderDiagnostics
     {
         public List<(string EventType, string Message, string? Details)> Events { get; } = [];
+        public Exception? Exception { get; set; }
         public Task WriteAsync(string eventType, string vietnameseMessage, string? technicalDetails, CancellationToken cancellationToken)
         {
+            if (Exception is not null) throw Exception;
             Events.Add((eventType, vietnameseMessage, technicalDetails));
             return Task.CompletedTask;
         }

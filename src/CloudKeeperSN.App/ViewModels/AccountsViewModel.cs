@@ -11,7 +11,10 @@ public enum AccountConnectionState
 {
     Disconnected,
     OpeningBrowser,
-    CompletingConnection,
+    WaitingForCallback,
+    ExchangingCode,
+    LoadingAccount,
+    VerifyingDrive,
     Connected,
     ReauthenticationRequired,
     Cancelled,
@@ -26,6 +29,7 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
     private readonly Func<CancellationToken, Task<StorageAccount>> _connect;
     private readonly Func<CancellationToken, Task> _disconnect;
     private readonly IProviderAuthenticationService? _authentication;
+    private readonly IUiDispatcher _uiDispatcher;
     private AccountConnectionState _state;
     private string? _accountName;
     private string? _email;
@@ -33,6 +37,7 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
     private bool _isProviderEnabled;
     private string? _disabledExplanation;
     private string? _configurationStatusMessage;
+    private string? _successMessage;
 
     public ProviderAccountCardViewModel(
         string providerId,
@@ -45,7 +50,8 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
         Func<CancellationToken, Task<StorageAccount?>> load,
         Func<CancellationToken, Task<StorageAccount>> connect,
         Func<CancellationToken, Task> disconnect,
-        IProviderAuthenticationService? authentication = null)
+        IProviderAuthenticationService? authentication = null,
+        IUiDispatcher? uiDispatcher = null)
     {
         ProviderId = providerId;
         ProviderName = providerName;
@@ -59,6 +65,7 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
         _connect = connect;
         _disconnect = disconnect;
         _authentication = authentication;
+        _uiDispatcher = uiDispatcher ?? InlineUiDispatcher.Instance;
         if (_authentication is not null)
         {
             _authentication.StateChanged += AuthenticationStateChanged;
@@ -76,6 +83,7 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
     public bool IsProviderEnabled { get => _isProviderEnabled; private set => SetProperty(ref _isProviderEnabled, value); }
     public string? DisabledExplanation { get => _disabledExplanation; private set => SetProperty(ref _disabledExplanation, value); }
     public string? ConfigurationStatusMessage { get => _configurationStatusMessage; private set => SetProperty(ref _configurationStatusMessage, value); }
+    public string? SuccessMessage { get => _successMessage; private set => SetProperty(ref _successMessage, value); }
     public ICommand ConnectCommand { get; }
     public ICommand DisconnectCommand { get; }
     public ICommand CancelConnectCommand { get; }
@@ -91,6 +99,7 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(IsBusy));
             OnPropertyChanged(nameof(CanCancelConnection));
             OnPropertyChanged(nameof(PrimaryActionText));
+            OnPropertyChanged(nameof(ConfigurationStatusMessage));
             NotifyCommands();
         }
     }
@@ -99,13 +108,19 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
     public string? Email { get => _email; private set => SetProperty(ref _email, value); }
     public string? ErrorMessage { get => _errorMessage; private set => SetProperty(ref _errorMessage, value); }
     public bool IsConnected => State == AccountConnectionState.Connected;
-    public bool IsBusy => State is AccountConnectionState.OpeningBrowser or AccountConnectionState.CompletingConnection or AccountConnectionState.Disconnecting;
-    public bool CanCancelConnection => State is AccountConnectionState.OpeningBrowser or AccountConnectionState.CompletingConnection;
+    public bool IsBusy => State is AccountConnectionState.OpeningBrowser or AccountConnectionState.WaitingForCallback or
+        AccountConnectionState.ExchangingCode or AccountConnectionState.LoadingAccount or AccountConnectionState.VerifyingDrive or
+        AccountConnectionState.Disconnecting;
+    public bool CanCancelConnection => State is AccountConnectionState.OpeningBrowser or AccountConnectionState.WaitingForCallback or
+        AccountConnectionState.ExchangingCode or AccountConnectionState.LoadingAccount or AccountConnectionState.VerifyingDrive;
     public string PrimaryActionText => State == AccountConnectionState.ReauthenticationRequired ? "Đăng nhập lại" : ConnectText;
     public StatusPresentation Status => State switch
     {
         AccountConnectionState.OpeningBrowser => new("Đang mở trình duyệt để đăng nhập", StatusTone.Information, "\uE895"),
-        AccountConnectionState.CompletingConnection => new("Đang hoàn tất kết nối", StatusTone.Information, "\uE895"),
+        AccountConnectionState.WaitingForCallback => new("Đang chờ phản hồi đăng nhập", StatusTone.Information, "\uE895"),
+        AccountConnectionState.ExchangingCode => new("Đang trao đổi mã xác thực", StatusTone.Information, "\uE895"),
+        AccountConnectionState.LoadingAccount => new("Đang tải thông tin tài khoản", StatusTone.Information, "\uE895"),
+        AccountConnectionState.VerifyingDrive => new("Đang xác minh quyền đọc Drive", StatusTone.Information, "\uE895"),
         AccountConnectionState.Connected => new("Đã kết nối", StatusTone.Success, "\uE73E"),
         AccountConnectionState.ReauthenticationRequired => new("Cần đăng nhập lại", StatusTone.Warning, "\uE7BA"),
         AccountConnectionState.Cancelled => new("Đã hủy đăng nhập", StatusTone.Neutral, "\uE711"),
@@ -121,6 +136,10 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
         State = account is { IsConnected: true } ? AccountConnectionState.Connected : AccountConnectionState.Disconnected;
         AccountName = account?.DisplayName;
         Email = account?.Email;
+        SuccessMessage = IsConnected ? $"Đã kết nối {ProviderName} thành công." : null;
+        ConfigurationStatusMessage = IsConnected
+            ? null
+            : IsProviderEnabled ? _authentication?.ConfigurationMessage ?? _configurationStatusMessage : null;
         ErrorMessage = IsProviderEnabled ? null : DisabledExplanation;
     }
 
@@ -128,8 +147,9 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
 
     private async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        State = _authentication is null ? AccountConnectionState.CompletingConnection : AccountConnectionState.OpeningBrowser;
+        State = _authentication is null ? AccountConnectionState.LoadingAccount : AccountConnectionState.OpeningBrowser;
         ErrorMessage = null;
+        SuccessMessage = null;
         try
         {
             Apply(await _connect(cancellationToken));
@@ -183,10 +203,18 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
 
     private void AuthenticationStateChanged(ProviderAuthenticationState state)
     {
+        _uiDispatcher.Invoke(() => ApplyAuthenticationState(state));
+    }
+
+    private void ApplyAuthenticationState(ProviderAuthenticationState state)
+    {
         State = state.Status switch
         {
             ProviderAuthenticationStatus.OpeningBrowser => AccountConnectionState.OpeningBrowser,
-            ProviderAuthenticationStatus.CompletingConnection => AccountConnectionState.CompletingConnection,
+            ProviderAuthenticationStatus.WaitingForCallback => AccountConnectionState.WaitingForCallback,
+            ProviderAuthenticationStatus.ExchangingCode => AccountConnectionState.ExchangingCode,
+            ProviderAuthenticationStatus.LoadingAccount => AccountConnectionState.LoadingAccount,
+            ProviderAuthenticationStatus.VerifyingDrive => AccountConnectionState.VerifyingDrive,
             ProviderAuthenticationStatus.Connected => AccountConnectionState.Connected,
             ProviderAuthenticationStatus.ReauthenticationRequired => AccountConnectionState.ReauthenticationRequired,
             ProviderAuthenticationStatus.Cancelled => AccountConnectionState.Cancelled,
@@ -195,15 +223,35 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
             _ => AccountConnectionState.Disconnected
         };
         if (state.Status is ProviderAuthenticationStatus.Failed or ProviderAuthenticationStatus.ReauthenticationRequired or ProviderAuthenticationStatus.Cancelled)
+        {
             ErrorMessage = state.VietnameseMessage;
+            AccountName = null;
+            Email = null;
+            SuccessMessage = null;
+        }
+        if (state.Status == ProviderAuthenticationStatus.Connected && state.Account is not null)
+        {
+            AccountName = state.Account.DisplayName;
+            Email = state.Account.Email;
+            ErrorMessage = null;
+            SuccessMessage = $"Đã kết nối {ProviderName} thành công.";
+            ConfigurationStatusMessage = null;
+        }
         if (state.Status == ProviderAuthenticationStatus.Disconnected)
         {
             AccountName = null;
             Email = null;
+            SuccessMessage = null;
+            ConfigurationStatusMessage = IsProviderEnabled ? _authentication?.ConfigurationMessage : null;
         }
     }
 
     private void AuthenticationConfigurationChanged()
+    {
+        _uiDispatcher.Invoke(ApplyAuthenticationConfiguration);
+    }
+
+    private void ApplyAuthenticationConfiguration()
     {
         if (_authentication is null) return;
         IsProviderEnabled = _authentication.IsConfigured;
@@ -248,7 +296,11 @@ public sealed class AccountsViewModel : PageViewModel, IDisposable
     private readonly DemoDataService _demoData;
     private string _pageMessage;
 
-    public AccountsViewModel(DemoDataService demoData, IDialogService dialogs, IProviderAuthenticationService? googleAuthentication = null)
+    public AccountsViewModel(
+        DemoDataService demoData,
+        IDialogService dialogs,
+        IProviderAuthenticationService? googleAuthentication = null,
+        IUiDispatcher? uiDispatcher = null)
         : base(
             "accounts",
             "Tài khoản",
@@ -261,11 +313,11 @@ public sealed class AccountsViewModel : PageViewModel, IDisposable
             : "Google Drive sử dụng trình duyệt hệ thống và chỉ yêu cầu quyền đọc. OneDrive thật chưa được tích hợp.";
 
         GoogleDrive = IsDemoEnabled
-            ? CreateDemoGoogle(demoData, dialogs)
-            : CreateRealGoogle(googleAuthentication ?? throw new InvalidOperationException("Real Google authentication service is required."), dialogs);
+            ? CreateDemoGoogle(demoData, dialogs, uiDispatcher)
+            : CreateRealGoogle(googleAuthentication ?? throw new InvalidOperationException("Real Google authentication service is required."), dialogs, uiDispatcher);
         OneDrive = IsDemoEnabled
-            ? CreateDemoOneDrive(demoData, dialogs)
-            : CreateUnavailableOneDrive(dialogs);
+            ? CreateDemoOneDrive(demoData, dialogs, uiDispatcher)
+            : CreateUnavailableOneDrive(dialogs, uiDispatcher);
     }
 
     public ProviderAccountCardViewModel GoogleDrive { get; }
@@ -279,29 +331,29 @@ public sealed class AccountsViewModel : PageViewModel, IDisposable
         await OneDrive.LoadAsync(cancellationToken);
     }
 
-    private static ProviderAccountCardViewModel CreateDemoGoogle(DemoDataService demo, IDialogService dialogs) => new(
+    private static ProviderAccountCardViewModel CreateDemoGoogle(DemoDataService demo, IDialogService dialogs, IUiDispatcher? dispatcher) => new(
         "google-drive", "Google Drive", "Quyền chỉ đọc. Không xóa dữ liệu nguồn.", "_Kết nối Google Drive", true, null, dialogs,
         async token => (await demo.GetAccountsAsync(token)).FirstOrDefault(account => account.ProviderId == "google-drive"),
         async token => { await demo.ConnectGoogleAsync(token); return (await demo.GetAccountsAsync(token)).First(account => account.ProviderId == "google-drive"); },
-        token => demo.DisconnectAsync("google-drive", token));
+        token => demo.DisconnectAsync("google-drive", token), uiDispatcher: dispatcher);
 
-    private static ProviderAccountCardViewModel CreateDemoOneDrive(DemoDataService demo, IDialogService dialogs) => new(
+    private static ProviderAccountCardViewModel CreateDemoOneDrive(DemoDataService demo, IDialogService dialogs, IUiDispatcher? dispatcher) => new(
         "one-drive", "OneDrive", "Chỉ dùng làm nơi lưu bản sao. Không ghi đè theo mặc định.", "_Kết nối OneDrive", true, null, dialogs,
         async token => (await demo.GetAccountsAsync(token)).FirstOrDefault(account => account.ProviderId == "one-drive"),
         async token => { await demo.ConnectOneDriveAsync(token); return (await demo.GetAccountsAsync(token)).First(account => account.ProviderId == "one-drive"); },
-        token => demo.DisconnectAsync("one-drive", token));
+        token => demo.DisconnectAsync("one-drive", token), uiDispatcher: dispatcher);
 
-    private static ProviderAccountCardViewModel CreateRealGoogle(IProviderAuthenticationService authentication, IDialogService dialogs) => new(
+    private static ProviderAccountCardViewModel CreateRealGoogle(IProviderAuthenticationService authentication, IDialogService dialogs, IUiDispatcher? dispatcher) => new(
         "google-drive", "Google Drive", "Chỉ đọc dữ liệu và siêu dữ liệu. Không thể sửa hoặc xóa dữ liệu nguồn.", "_Kết nối Google Drive",
         authentication.IsConfigured, authentication.ConfigurationMessage, dialogs,
-        authentication.GetCachedAccountAsync, authentication.ConnectAsync, authentication.DisconnectAsync, authentication);
+        authentication.GetCachedAccountAsync, authentication.ConnectAsync, authentication.DisconnectAsync, authentication, dispatcher);
 
-    private static ProviderAccountCardViewModel CreateUnavailableOneDrive(IDialogService dialogs) => new(
+    private static ProviderAccountCardViewModel CreateUnavailableOneDrive(IDialogService dialogs, IUiDispatcher? dispatcher) => new(
         "one-drive", "OneDrive", "Tích hợp OneDrive thật chưa có trong phiên bản này.", "Kết nối OneDrive", false,
         "OneDrive thật sẽ được bổ sung ở bước phát triển tiếp theo; không có đích giả nào được dùng trong chế độ thật.", dialogs,
         _ => Task.FromResult<StorageAccount?>(null),
         _ => throw new NotSupportedException(),
-        _ => Task.CompletedTask);
+        _ => Task.CompletedTask, uiDispatcher: dispatcher);
 
     public void Dispose()
     {

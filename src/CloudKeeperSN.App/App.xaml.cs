@@ -60,6 +60,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IDemoDelay, DemoDelay>();
         services.AddSingleton<DemoTransferEngine>();
         services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<IUiDispatcher>(_ => new WpfUiDispatcher(Dispatcher));
         services.AddSingleton<IGoogleOAuthFilePickerService, GoogleOAuthFilePickerService>();
         services.AddSingleton<IFolderPickerService, FolderPickerService>();
         services.AddSingleton<IDiagnosticExportService, DiagnosticExportService>();
@@ -71,7 +72,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton(provider => new AccountsViewModel(
             provider.GetRequiredService<DemoDataService>(),
             provider.GetRequiredService<IDialogService>(),
-            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IProviderAuthenticationService>()));
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IProviderAuthenticationService>(),
+            provider.GetRequiredService<IUiDispatcher>()));
         services.AddSingleton<BackupViewModel>();
         services.AddSingleton<HistoryViewModel>();
         services.AddSingleton(provider => new SettingsViewModel(

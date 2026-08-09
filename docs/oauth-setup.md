@@ -75,7 +75,9 @@ Cả hai biến phải tồn tại và hợp lệ. Imported Settings configurati
 
 ## 6. Browser callback và session
 
-Listener dùng random-port loopback `127.0.0.1`, state ngẫu nhiên được kiểm tra constant-time và timeout năm phút. Chỉ một sign-in chạy cùng lúc; người dùng có thể chọn **Hủy đăng nhập**. Sau token exchange, CloudKeeperSN gọi Drive `about.user`; chỉ khi truy cập thành công ứng dụng mới hiển thị **Đã kết nối**, tên và email.
+Listener dùng random-port loopback `127.0.0.1`, state ngẫu nhiên được kiểm tra constant-time và thời gian chờ callback là năm phút. Trang callback chỉ xác nhận CloudKeeperSN đã nhận phản hồi và đang hoàn tất đăng nhập; trang này không tuyên bố tài khoản đã kết nối trước khi trao đổi mã thành công. Trao đổi authorization code có timeout riêng 45 giây.
+
+Chỉ một sign-in chạy cùng lúc; người dùng có thể chọn **Hủy đăng nhập**. UI hiển thị lần lượt trạng thái mở browser, chờ callback, trao đổi mã, tải tài khoản và xác minh Drive. Sau khi authorization đã được lưu trong protected credential store, CloudKeeperSN gọi Drive `about.user` để lấy danh tính rồi thực hiện một `files.list` chỉ lấy `id` với kích thước trang 1. Chỉ khi cả hai request chỉ đọc thành công và metadata tài khoản đã được lưu, ứng dụng mới công bố **Đã kết nối**, tên và email. Lỗi hoặc hủy ở bất kỳ bước nào đều xóa authorization chưa hoàn chỉnh và cho phép thử lại.
 
 Lần chạy sau, protected token được khôi phục/refresh và account identity được xác nhận lại. Token revoked hoặc không giải mã được chuyển UI sang **Cần đăng nhập lại** mà không thay đổi dữ liệu Drive.
 
@@ -91,6 +93,19 @@ Lần chạy sau, protected token được khôi phục/refresh và account iden
 - **redirect_uri_mismatch**: client thường sai loại; không dùng Web client.
 - **Không mở được callback**: kiểm tra firewall/endpoint security có chặn loopback.
 - **Đóng browser**: chọn **Hủy đăng nhập** hoặc đợi timeout năm phút.
+
+## 9. Checklist xác minh thủ công trên Windows
+
+Các bước này cần người dùng thực hiện với OAuth Desktop configuration thật; test tự động không mở GUI hoặc browser:
+
+1. Khởi động CloudKeeperSN và xác nhận **Kết nối Google Drive** được bật.
+2. Chọn kết nối, hoàn tất consent trong browser hệ thống rồi quay lại ứng dụng.
+3. Xác nhận trạng thái tự chuyển sang **Đã kết nối**, tên/email xuất hiện và **Ngắt kết nối** được bật mà không đổi trang hoặc khởi động lại.
+4. Khởi động lại ứng dụng và xác nhận protected session được khôi phục.
+5. Ngắt kết nối và xác nhận chỉ authorization cục bộ bị xóa; dữ liệu Drive không thay đổi.
+6. Hủy một lần đăng nhập và từ chối consent ở một lần khác; cả hai lần phải hiện thông báo tiếng Việt có thể phục hồi và nút kết nối phải bật lại.
+7. Xác nhận không trạng thái nào kẹt ở đang tải, kể cả khi callback hoặc mạng hết thời gian chờ.
+8. Xác nhận không file/thư mục Google Drive nào được tạo, sửa, di chuyển, đổi tên hoặc xóa.
 
 ## Không có Microsoft/OneDrive thật
 

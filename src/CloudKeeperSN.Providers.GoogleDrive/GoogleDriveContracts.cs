@@ -24,7 +24,17 @@ public sealed record GoogleDriveMetadataPage(
 public interface IGoogleDriveSession : IAsyncDisposable
 {
     Task<GoogleAccountProfile> GetAccountProfileAsync(CancellationToken cancellationToken);
+    Task VerifyReadOnlyAccessAsync(CancellationToken cancellationToken);
     Task<GoogleDriveMetadataPage> GetChildrenPageAsync(string parentItemId, string? pageToken, CancellationToken cancellationToken);
+}
+
+public enum GoogleOAuthStage
+{
+    WaitingForCallback,
+    CallbackReceived,
+    StateValidated,
+    ExchangingCode,
+    AuthorizationStored
 }
 
 public interface IGoogleOAuthClient
@@ -33,7 +43,9 @@ public interface IGoogleOAuthClient
     string? ConfigurationMessage { get; }
     event Action? ConfigurationChanged;
     Task<IGoogleDriveSession?> RestoreAsync(CancellationToken cancellationToken);
-    Task<IGoogleDriveSession> AuthorizeAsync(CancellationToken cancellationToken);
+    Task<IGoogleDriveSession> AuthorizeAsync(
+        Func<GoogleOAuthStage, CancellationToken, Task> reportStageAsync,
+        CancellationToken cancellationToken);
     Task DisconnectAsync(CancellationToken cancellationToken);
     Task ClearLocalAuthorizationAsync(CancellationToken cancellationToken);
 }

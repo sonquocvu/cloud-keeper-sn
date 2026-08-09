@@ -90,7 +90,10 @@ public enum ProviderAuthenticationStatus
 {
     Disconnected,
     OpeningBrowser,
-    CompletingConnection,
+    WaitingForCallback,
+    ExchangingCode,
+    LoadingAccount,
+    VerifyingDrive,
     Connected,
     ReauthenticationRequired,
     Cancelled,
@@ -101,4 +104,6 @@ public enum ProviderAuthenticationStatus
 public sealed record ProviderAuthenticationState(
     ProviderAuthenticationStatus Status,
     string VietnameseMessage,
-    string? TechnicalCategory = null);
+    string? TechnicalCategory = null,
+    StorageAccount? Account = null,
+    Guid? AttemptId = null);

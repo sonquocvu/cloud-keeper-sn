@@ -285,7 +285,10 @@ public sealed class SettingsViewModel : PageViewModel, IDisposable
 
     private bool IsAuthenticationBusy() => _googleAuthentication?.State.Status is
         ProviderAuthenticationStatus.OpeningBrowser or
-        ProviderAuthenticationStatus.CompletingConnection or
+        ProviderAuthenticationStatus.WaitingForCallback or
+        ProviderAuthenticationStatus.ExchangingCode or
+        ProviderAuthenticationStatus.LoadingAccount or
+        ProviderAuthenticationStatus.VerifyingDrive or
         ProviderAuthenticationStatus.Disconnecting;
 
     private void GoogleOAuthConfigurationChanged(GoogleOAuthConfigurationMetadata metadata)
