@@ -19,5 +19,10 @@ These rules are mandatory and take priority over convenience:
 15. Imported OAuth client configuration is accepted only from a validated Google Desktop `installed` JSON object and is DPAPI CurrentUser protected outside SQLite.
 16. Replacing or removing OAuth configuration clears only local authorization for the previous client; it does not revoke access remotely or change Drive data automatically.
 17. OAuth client secrets, original JSON, source paths and unmasked client IDs are never exposed through Settings view-model display state, logs or diagnostic exports.
+18. A production inventory scan calls metadata endpoints only: no `alt=media`, download, export, upload, copy, create, update, move, trash, delete, or permission mutation.
+19. Trashed items are excluded by the server-side `trashed = false` query and are also rejected defensively by provider mapping.
+20. Shortcuts are stored as shortcut records and their targets are never recursively followed.
+21. Only a run with every page persisted and hierarchy completed may set `is_complete=1`; cancelled, failed, interrupted, and reauthentication-required runs cannot replace the latest successful snapshot.
+22. Shared drives are outside the current scan boundary and the UI/documentation must not imply complete shared-drive support.
 
 The production Google provider exposes authentication/browse/metadata/export-planning capabilities only. It has no content-read, export execution, folder-create or write capability. DPAPI credential storage, migration constraints, redaction, pagination guards, complete-scan-only persistence and tests enforce these rules. A later destination/transfer pipeline must preserve them.

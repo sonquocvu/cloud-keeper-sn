@@ -15,9 +15,9 @@
                 <TextBlock Text="6. Xem kết quả" Style="{StaticResource CaptionText}" TextAlignment="Center"/>
                 </UniformGrid>
                 <UniformGrid Columns="3" Visibility="{Binding IsProductionMode, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="1. Chọn nguồn" Style="{StaticResource CaptionText}" TextAlignment="Center"/>
+                <TextBlock Text="1. Kiểm tra tài khoản" Style="{StaticResource CaptionText}" TextAlignment="Center"/>
                 <TextBlock Text="2. Quét siêu dữ liệu" Style="{StaticResource CaptionText}" TextAlignment="Center"/>
-                <TextBlock Text="3. Xem kế hoạch" Style="{StaticResource CaptionText}" TextAlignment="Center"/>
+                <TextBlock Text="3. Xem kết quả" Style="{StaticResource CaptionText}" TextAlignment="Center"/>
                 </UniformGrid>
             </Grid>
         </Border>
@@ -31,11 +31,12 @@
                         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="20"/><ColumnDefinition/></Grid.ColumnDefinitions>
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
-                                <TextBlock Text="1. Chọn nguồn" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
+                                <TextBlock Text="1. Nguồn quét" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
                                 <TextBlock Text="Google Drive" Style="{StaticResource CardTitleText}" Margin="0,18,0,0"/>
                                 <TextBlock Text="{Binding AccountDisplayName}" Style="{StaticResource SupportingText}" Margin="0,4,0,0"/>
                                 <Border Background="{DynamicResource BackgroundSecondary}" CornerRadius="7" Padding="12" Margin="0,16,0,0"><TextBlock Text="{Binding SourceFolderLabel}" TextTrimming="CharacterEllipsis"/></Border>
-                                <Button Content="Chọn thư mục nguồn" Command="{Binding SelectSourceCommand}" Margin="0,12,0,0" HorizontalAlignment="Left" automation:AutomationProperties.Name="Chọn thư mục nguồn trên Google Drive"/>
+                                <Button Content="Chọn thư mục nguồn" Command="{Binding SelectSourceCommand}" Margin="0,12,0,0" HorizontalAlignment="Left" automation:AutomationProperties.Name="Chọn thư mục nguồn trên Google Drive"
+                                        Visibility="{Binding IsDemoMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                 <TextBlock Text="CloudKeeperSN chỉ đọc dữ liệu từ Google Drive và không thay đổi hoặc xóa dữ liệu nguồn." Style="{StaticResource CaptionText}" Margin="0,16,0,0"/>
                             </StackPanel>
                         </Border>
@@ -52,18 +53,48 @@
                     </Grid>
                     <Border Style="{StaticResource Card}" Margin="0,20,0,0">
                         <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <StackPanel><TextBlock Text="3. Quét và xem trước" Style="{StaticResource CardTitleText}"/><TextBlock Text="{Binding ValidationMessage}" Style="{StaticResource SupportingText}" Margin="0,4,18,0"/></StackPanel>
+                            <StackPanel><TextBlock Text="Quét Google Drive" Style="{StaticResource CardTitleText}"/><TextBlock Text="{Binding ValidationMessage}" Style="{StaticResource SupportingText}" Margin="0,4,18,0"/></StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <StackPanel Visibility="{Binding IsScanning, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,16,0">
                                     <controls:LoadingIndicator Message="Đang quét nguồn…"/>
+                                    <ProgressBar IsIndeterminate="True" Height="6" Margin="0,8,0,0" automation:AutomationProperties.Name="Tiến độ quét Google Drive không xác định"/>
                                     <Button Content="_Hủy quét" Command="{Binding CancelScanCommand}" Margin="0,8,0,0" HorizontalAlignment="Center"/>
                                 </StackPanel>
-                                <Button Content="_Quét và xem trước" Command="{Binding ScanCommand}" Style="{StaticResource PrimaryButton}" automation:AutomationProperties.HelpText="Không truyền tệp; chỉ tạo bản xem trước"/>
+                                <Button Content="{Binding ScanActionText}" Command="{Binding ScanCommand}" Style="{StaticResource PrimaryButton}" automation:AutomationProperties.HelpText="Không tải nội dung; chỉ lập danh mục siêu dữ liệu"/>
                             </StackPanel>
                         </Grid>
                     </Border>
                     <TextBlock Text="{Binding ScanProgressText}" Style="{StaticResource CaptionText}" Margin="4,10,4,0" automation:AutomationProperties.LiveSetting="Polite"/>
                     <TextBlock Text="{Binding ScanErrorMessage}" Foreground="{DynamicResource Error}" TextWrapping="Wrap" Margin="4,8,4,0" automation:AutomationProperties.LiveSetting="Assertive"/>
+                    <controls:InlineNotification Title="Quét hoàn tất" Message="{Binding ScanSuccessMessage}" Tone="Success" Margin="0,14,0,0"
+                                                 Visibility="{Binding ScanSuccessMessage, Converter={StaticResource NullToVisibilityConverter}}"/>
+                    <Border Style="{StaticResource Card}" Margin="0,20,0,0"
+                            Visibility="{Binding HasInventorySummary, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="Lần quét gần nhất" Style="{StaticResource SectionTitleText}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding InventorySummary.CompletedLabel}" Style="{StaticResource CaptionText}" VerticalAlignment="Center"/>
+                            </Grid>
+                            <UniformGrid Columns="5" Margin="0,18,0,0">
+                                <StackPanel><TextBlock Text="Tệp" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.FileCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
+                                <StackPanel><TextBlock Text="Thư mục" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.FolderCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
+                                <StackPanel><TextBlock Text="Tệp Google Workspace" Style="{StaticResource CaptionText}" TextWrapping="Wrap"/><TextBlock Text="{Binding InventorySummary.GoogleWorkspaceFileCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
+                                <StackPanel><TextBlock Text="Chưa rõ kích thước" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.UnknownSizeCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
+                                <StackPanel><TextBlock Text="Mục cần kiểm tra" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.UnresolvedCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
+                            </UniformGrid>
+                            <WrapPanel Margin="0,16,0,0">
+                                <TextBlock Text="{Binding InventorySummary.KnownBytesLabel, StringFormat=Tổng dung lượng đã xác định: {0}}" Style="{StaticResource SupportingText}" Margin="0,0,24,0"/>
+                                <TextBlock Text="{Binding InventorySummary.BackupEligibleCount, StringFormat=Đủ điều kiện sao lưu trong tương lai: {0:N0} mục}" Style="{StaticResource SupportingText}"/>
+                            </WrapPanel>
+                            <WrapPanel Margin="0,8,0,0">
+                                <TextBlock Text="{Binding InventorySummary.TotalUsageLabel, StringFormat=Tổng dung lượng đã dùng: {0}}" Style="{StaticResource CaptionText}" Margin="0,0,24,0"/>
+                                <TextBlock Text="{Binding InventorySummary.StorageLimitLabel, StringFormat=Giới hạn lưu trữ: {0}}" Style="{StaticResource CaptionText}" Margin="0,0,24,0"/>
+                                <TextBlock Text="{Binding InventorySummary.DriveUsageLabel, StringFormat=Google Drive: {0}}" Style="{StaticResource CaptionText}" Margin="0,0,24,0"/>
+                                <TextBlock Text="{Binding InventorySummary.TrashUsageLabel, StringFormat=Thùng rác: {0}}" Style="{StaticResource CaptionText}"/>
+                            </WrapPanel>
+                            <TextBlock Text="CloudKeeperSN chỉ đọc thông tin tệp. Không có dữ liệu nào trên Google Drive bị thay đổi." Style="{StaticResource CaptionText}" Margin="0,14,0,0"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <StackPanel Visibility="{Binding IsPreview, Converter={StaticResource BooleanToVisibilityConverter}}">

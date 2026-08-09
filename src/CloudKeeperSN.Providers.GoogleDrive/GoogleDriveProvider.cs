@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
 using CloudKeeperSN.Application.Persistence;
 using CloudKeeperSN.Application.Storage;
+using CloudKeeperSN.Application.Scanning;
 using CloudKeeperSN.Domain.Export;
+using CloudKeeperSN.Domain.Scanning;
 using CloudKeeperSN.Domain.Storage;
 using CloudKeeperSN.Providers.GoogleDrive.Authentication;
 
@@ -10,7 +12,7 @@ namespace CloudKeeperSN.Providers.GoogleDrive;
 
 public sealed class GoogleDriveProvider(
     GoogleAuthenticationService authentication,
-    IProviderDiagnostics diagnostics) : IStorageProvider, IPagedStorageBrowserCapability
+    IProviderDiagnostics diagnostics) : IStorageProvider, IPagedStorageBrowserCapability, IDriveInventorySource
 {
     public const string ProviderId = "google-drive";
     public const string RootFolderId = "root";
@@ -78,6 +80,40 @@ public sealed class GoogleDriveProvider(
         } while (token is not null);
     }
 
+    public async Task<DriveStorageInformation> GetStorageInformationAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var session = await authentication.GetRequiredSessionAsync(cancellationToken);
+            var storage = await session.GetStorageInformationAsync(cancellationToken);
+            return new DriveStorageInformation(
+                storage.StorageLimitBytes, storage.TotalUsageBytes, storage.DriveUsageBytes, storage.TrashUsageBytes);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception exception) { throw GoogleProviderExceptionMapper.Map(exception); }
+    }
+
+    public async Task<DriveInventoryPage> GetInventoryPageAsync(
+        Guid scanId,
+        string providerAccountId,
+        string? pageToken,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var session = await authentication.GetRequiredSessionAsync(cancellationToken);
+            var account = authentication.CurrentAccount;
+            if (account is null || !string.Equals(account.ProviderAccountId, providerAccountId, StringComparison.Ordinal))
+                throw new ProviderOperationException(ProviderFailureCategory.AuthenticationRequired,
+                    ProviderFailureMessages.ToVietnamese(ProviderFailureCategory.AuthenticationRequired));
+            var page = await session.GetInventoryPageAsync(pageToken, cancellationToken);
+            var items = page.Items.Where(item => !item.IsTrashed).Select(item => MapInventory(scanId, item)).ToArray();
+            return new DriveInventoryPage(items, page.NextPageToken, page.IsIncomplete);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception exception) { throw GoogleProviderExceptionMapper.Map(exception); }
+    }
+
     private static StorageItem Map(string accountId, GoogleDriveItemMetadata item)
     {
         var kind = item.MimeType switch
@@ -112,6 +148,51 @@ public sealed class GoogleDriveProvider(
             Checksums = string.IsNullOrWhiteSpace(item.Md5Checksum) ? [] : [new ProviderChecksum("MD5", item.Md5Checksum)],
             ProviderMetadata = new ReadOnlyDictionary<string, string>(metadata)
         };
+    }
+
+    private static DriveInventoryItem MapInventory(Guid scanId, GoogleDriveItemMetadata item)
+    {
+        var kind = item.MimeType switch
+        {
+            FolderMimeType => DriveInventoryItemKind.Folder,
+            GoogleNativeExportPolicy.GoogleShortcut => DriveInventoryItemKind.Shortcut,
+            _ when item.MimeType.StartsWith("application/vnd.google-apps.", StringComparison.Ordinal) => DriveInventoryItemKind.GoogleWorkspaceFile,
+            _ => DriveInventoryItemKind.File
+        };
+        var nativeDecision = kind == DriveInventoryItemKind.GoogleWorkspaceFile
+            ? GoogleNativeExportPolicy.Decide(item.MimeType)
+            : null;
+        var eligible = kind == DriveInventoryItemKind.File || nativeDecision?.IsSupported == true;
+        var skipReason = kind switch
+        {
+            DriveInventoryItemKind.Folder => "Thư mục được lưu để dựng cấu trúc; không phải nội dung tệp.",
+            DriveInventoryItemKind.Shortcut => "Lối tắt được ghi nhận nhưng không tự động lần theo.",
+            DriveInventoryItemKind.GoogleWorkspaceFile when nativeDecision?.IsSupported != true => nativeDecision?.VietnameseExplanation,
+            _ => null
+        };
+        var location = item.IsShared || item.IsOwnedByUser == false
+            ? DriveInventoryLocation.Shared
+            : DriveInventoryLocation.MyDrive;
+        return new DriveInventoryItem(
+            scanId,
+            item.Id,
+            item.Name,
+            item.ParentIds.FirstOrDefault(),
+            $"Đang xác định/{item.Name.Replace('/', '／')}",
+            item.MimeType,
+            kind,
+            location,
+            item.Size,
+            item.CreatedAtUtc,
+            item.ModifiedAtUtc,
+            item.Md5Checksum,
+            item.FileExtension,
+            item.ShortcutTargetId,
+            item.ShortcutTargetMimeType,
+            item.IsShared,
+            item.IsOwnedByUser,
+            eligible,
+            skipReason);
     }
 
     private static ProviderOperationException InvalidPagination(string technicalMessage) => new(

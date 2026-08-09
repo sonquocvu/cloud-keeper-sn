@@ -1,14 +1,12 @@
 using System.Collections.ObjectModel;
-using System.Text.Json;
 using System.Windows.Input;
 using CloudKeeperSN.App.Development;
 using CloudKeeperSN.App.Presentation;
 using CloudKeeperSN.App.Services;
-using CloudKeeperSN.Application.Persistence;
 using CloudKeeperSN.Application.Scanning;
 using CloudKeeperSN.Application.Storage;
-using CloudKeeperSN.Domain.Export;
 using CloudKeeperSN.Domain.Storage;
+using CloudKeeperSN.Domain.Scanning;
 using CloudKeeperSN.Domain.Transfers;
 
 namespace CloudKeeperSN.App.ViewModels;
@@ -92,6 +90,30 @@ public sealed record BackupResultViewModel(
     string DestinationPath,
     bool CanRetryFailed);
 
+public sealed record DriveInventorySummaryViewModel(
+    DateTimeOffset CompletedAt,
+    int TotalItems,
+    int FileCount,
+    int FolderCount,
+    long KnownBytes,
+    int UnknownSizeCount,
+    int GoogleWorkspaceFileCount,
+    int ShortcutCount,
+    int UnresolvedCount,
+    int BackupEligibleCount,
+    long? StorageLimitBytes,
+    long? TotalUsageBytes,
+    long? DriveUsageBytes,
+    long? TrashUsageBytes)
+{
+    public string CompletedLabel => CompletedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+    public string KnownBytesLabel => DashboardViewModel.FormatBytes(KnownBytes);
+    public string StorageLimitLabel => StorageLimitBytes is { } value ? DashboardViewModel.FormatBytes(value) : "Không giới hạn/không có thông tin";
+    public string TotalUsageLabel => TotalUsageBytes is { } value ? DashboardViewModel.FormatBytes(value) : "Không có thông tin";
+    public string DriveUsageLabel => DriveUsageBytes is { } value ? DashboardViewModel.FormatBytes(value) : "Không có thông tin";
+    public string TrashUsageLabel => TrashUsageBytes is { } value ? DashboardViewModel.FormatBytes(value) : "Không có thông tin";
+}
+
 public sealed class BackupViewModel : PageViewModel, IDisposable
 {
     private readonly DemoDataService _demoData;
@@ -101,7 +123,8 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
     private readonly IDialogService _dialogs;
     private readonly bool _isDemoMode;
     private readonly IStorageProvider? _realGoogleProvider;
-    private readonly IApplicationSettingRepository? _settings;
+    private readonly IDriveInventoryScanner? _inventoryScanner;
+    private readonly IUiDispatcher _uiDispatcher;
     private readonly List<PreviewItemViewModel> _allPreviewItems = [];
     private CancellationTokenSource? _runCancellation;
     private bool _googleConnected;
@@ -125,10 +148,11 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
     private int _failedCount;
     private int _retryCount;
     private BackupResultViewModel? _result;
-    private string? _realGoogleAccountId;
     private string _accountDisplayName = "Google Drive";
     private string _scanProgressText = "Chưa bắt đầu quét.";
     private string? _scanErrorMessage;
+    private string? _scanSuccessMessage;
+    private DriveInventorySummaryViewModel? _inventorySummary;
 
     public BackupViewModel(
         DemoDataService demoData,
@@ -136,7 +160,7 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         DemoTransferEngine transferEngine,
         IFolderPickerService folderPicker,
         IDialogService dialogs)
-        : this(demoData, planner, transferEngine, folderPicker, dialogs, true, null, null)
+        : this(demoData, planner, transferEngine, folderPicker, dialogs, true, null, null, null)
     {
     }
 
@@ -148,7 +172,8 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         IDialogService dialogs,
         DemoConfiguration configuration,
         IEnumerable<IStorageProvider> providers,
-        IApplicationSettingRepository settings)
+        IDriveInventoryScanner? inventoryScanner = null,
+        IUiDispatcher? uiDispatcher = null)
         : this(
             demoData,
             planner,
@@ -157,7 +182,8 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
             dialogs,
             configuration.IsEnabled,
             providers.SingleOrDefault(provider => provider.Descriptor.ProviderId == "google-drive"),
-            settings)
+            inventoryScanner,
+            uiDispatcher)
     {
     }
 
@@ -169,11 +195,12 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         IDialogService dialogs,
         bool isDemoMode,
         IStorageProvider? realGoogleProvider,
-        IApplicationSettingRepository? settings)
+        IDriveInventoryScanner? inventoryScanner,
+        IUiDispatcher? uiDispatcher)
         : base(
             "backup",
             isDemoMode ? "Sao lưu một chiều" : "Quét Google Drive chỉ đọc",
-            isDemoMode ? "Google Drive là nguồn; OneDrive là nơi lưu bản sao." : "Duyệt, quét siêu dữ liệu và lập kế hoạch; chưa truyền nội dung tệp.")
+            isDemoMode ? "Google Drive là nguồn; OneDrive là nơi lưu bản sao." : "Quét và lập danh mục siêu dữ liệu cục bộ; chưa truyền nội dung tệp.")
     {
         _demoData = demoData;
         _planner = planner;
@@ -182,7 +209,9 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         _dialogs = dialogs;
         _isDemoMode = isDemoMode;
         _realGoogleProvider = realGoogleProvider;
-        _settings = settings;
+        _inventoryScanner = inventoryScanner;
+        _uiDispatcher = uiDispatcher ?? InlineUiDispatcher.Instance;
+        if (_inventoryScanner is not null) _inventoryScanner.StateChanged += InventoryScannerStateChanged;
         PreviewFilters =
         [
             new("all", "Tất cả", null),
@@ -193,7 +222,7 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
             new("unsupported", "Không được hỗ trợ", PreviewItemCategory.Unsupported)
         ];
         _selectedFilter = PreviewFilters[0];
-        SelectSourceCommand = new AsyncRelayCommand(SelectSourceAsync, () => _googleConnected && Stage == BackupWorkflowStage.Setup);
+        SelectSourceCommand = new AsyncRelayCommand(SelectSourceAsync, () => IsDemoMode && _googleConnected && Stage == BackupWorkflowStage.Setup);
         SelectDestinationCommand = new AsyncRelayCommand(SelectDestinationAsync, () => _oneDriveConnected && Stage == BackupWorkflowStage.Setup);
         ScanCommand = new AsyncRelayCommand(ScanAsync, () => CanScan);
         StartBackupCommand = new AsyncRelayCommand(StartBackupAsync, () => IsDemoMode && Stage == BackupWorkflowStage.Preview && Preview is not null);
@@ -236,13 +265,17 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         (IsProductionMode || (_oneDriveConnected && DestinationFolder is not null));
     public string ValidationMessage => !_googleConnected ? "Hãy kết nối Google Drive trên trang Tài khoản."
         : SourceFolder is null ? "Hãy chọn thư mục nguồn trên Google Drive."
-        : IsProductionMode ? "Đã sẵn sàng quét siêu dữ liệu và lập bản xem trước chỉ đọc."
+        : IsProductionMode ? "Đã sẵn sàng tạo danh mục siêu dữ liệu chỉ đọc."
         : !_oneDriveConnected ? "Hãy kết nối OneDrive trên trang Tài khoản."
         : DestinationFolder is null ? "Hãy chọn thư mục đích trên OneDrive."
         : "Đã đủ thông tin để quét và xem trước.";
     public bool IsScanning { get => _isScanning; private set { if (SetProperty(ref _isScanning, value)) NotifyState(); } }
     public string ScanProgressText { get => _scanProgressText; private set => SetProperty(ref _scanProgressText, value); }
     public string? ScanErrorMessage { get => _scanErrorMessage; private set => SetProperty(ref _scanErrorMessage, value); }
+    public string? ScanSuccessMessage { get => _scanSuccessMessage; private set => SetProperty(ref _scanSuccessMessage, value); }
+    public DriveInventorySummaryViewModel? InventorySummary { get => _inventorySummary; private set { if (SetProperty(ref _inventorySummary, value)) OnPropertyChanged(nameof(HasInventorySummary)); } }
+    public bool HasInventorySummary => InventorySummary is not null;
+    public string ScanActionText => IsProductionMode ? "_Bắt đầu quét" : "_Quét và xem trước";
     public string TransferAvailabilityMessage => IsProductionMode
         ? "Chưa thể bắt đầu sao lưu: bản dựng này chưa có đích lưu trữ thực. Không có tệp nào được tải xuống, xuất hoặc truyền."
         : "Google Drive không bị thay đổi. OneDrive không bị xóa hoặc ghi đè theo mặc định.";
@@ -269,9 +302,10 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
             var account = _realGoogleProvider is null ? null : await _realGoogleProvider.GetConnectedAccountAsync(cancellationToken);
             _googleConnected = account?.IsConnected == true;
             _oneDriveConnected = false;
-            _realGoogleAccountId = account?.ProviderAccountId;
             AccountDisplayName = account is null ? "Google Drive chưa kết nối" : account.Email ?? account.DisplayName;
-            await RestoreRealSelectionAsync(cancellationToken);
+            SourceFolder = account is null ? null : new FolderSelectionViewModel("google-drive", account.ProviderAccountId, "root", "Drive của tôi");
+            if (account is not null && _inventoryScanner is not null)
+                ApplyInventorySummary(await _inventoryScanner.GetLatestSuccessfulAsync(account.ProviderAccountId, cancellationToken));
             NotifyState();
             return;
         }
@@ -284,14 +318,10 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
 
     private async Task SelectSourceAsync(CancellationToken cancellationToken)
     {
-        var accountId = IsDemoMode ? DemoDataService.GoogleAccountId : _realGoogleAccountId;
-        if (string.IsNullOrWhiteSpace(accountId)) return;
-        var selected = await _folderPicker.PickAsync(new FolderPickerRequest("google-drive", accountId, "root", "Chọn thư mục nguồn trên Google Drive", false), cancellationToken);
+        if (!IsDemoMode) return;
+        var selected = await _folderPicker.PickAsync(new FolderPickerRequest("google-drive", DemoDataService.GoogleAccountId, "root", "Chọn thư mục nguồn trên Google Drive", false), cancellationToken);
         if (selected is not null)
-        {
             SourceFolder = new(selected.ProviderId, selected.AccountId, selected.FolderId, selected.DisplayPath);
-            if (IsProductionMode) await PersistRealSelectionAsync(cancellationToken);
-        }
     }
 
     private async Task SelectDestinationAsync(CancellationToken cancellationToken)
@@ -305,19 +335,18 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         if (!CanScan || SourceFolder is null) return;
         IsScanning = true;
         ScanErrorMessage = null;
-        Preview = null;
+        ScanSuccessMessage = null;
+        if (IsDemoMode) Preview = null;
         try
         {
             if (IsProductionMode)
             {
-                var browser = _realGoogleProvider as IStorageBrowserCapability
-                    ?? throw new InvalidOperationException("Google Drive không hỗ trợ duyệt thư mục.");
-                var progress = new Progress<SourceScanProgress>(value =>
-                    ScanProgressText = $"Đã phát hiện {value.DiscoveredItems:N0} mục; đang đọc {value.CurrentPath}.");
-                var scan = await new SourceScanner(browser).ScanAsync(SourceFolder.AccountId, SourceFolder.FolderId, cancellationToken, progress);
-                Preview = BuildRealPreview(SourceFolder.DisplayPath, scan);
-                ScanProgressText = $"Hoàn tất: {scan.FileCount:N0} tệp, {scan.FolderCount:N0} thư mục.";
-                await PersistScanSummaryAsync(scan, cancellationToken);
+                if (_inventoryScanner is null) throw new InvalidOperationException("Dịch vụ quét Google Drive chưa sẵn sàng.");
+                var scan = await _inventoryScanner.ScanAsync(cancellationToken);
+                ApplyInventorySummary(scan);
+                ScanProgressText = $"Quét hoàn tất: {scan.TotalItems:N0} mục.";
+                ScanSuccessMessage = "Đã quét Google Drive thành công.";
+                return;
             }
             else
             {
@@ -333,65 +362,51 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            ScanProgressText = "Đã hủy quét. Kết quả chưa hoàn tất không được dùng làm bản xem trước.";
+            ScanProgressText = IsProductionMode && _inventoryScanner?.State.Status == DriveInventoryScanStatus.Cancelled
+                ? _inventoryScanner.State.VietnameseMessage
+                : "Đã hủy quét. Kết quả chưa hoàn tất không được dùng làm bản xem trước.";
             throw;
         }
         catch (Exception exception)
         {
-            ScanErrorMessage = exception is ProviderOperationException failure
-                ? ProviderFailureMessages.ToVietnamese(failure.Category)
-                : "Không thể hoàn tất bản quét. Không có dữ liệu Google Drive nào bị thay đổi; vui lòng thử lại.";
+            ScanErrorMessage = IsProductionMode && _inventoryScanner is not null
+                ? _inventoryScanner.State.VietnameseMessage
+                : exception is ProviderOperationException failure
+                    ? ProviderFailureMessages.ToVietnamese(failure.Category)
+                    : "Không thể hoàn tất bản quét. Không có dữ liệu Google Drive nào bị thay đổi; vui lòng thử lại.";
             ScanProgressText = "Bản quét chưa hoàn tất.";
         }
         finally { IsScanning = false; }
     }
 
-    private static BackupPreviewViewState BuildRealPreview(string sourcePath, SourceScanResult scan)
-    {
-        var items = new List<PreviewItemViewModel>();
-        var exportCount = 0;
-        foreach (var scanned in scan.Items.Where(scanned => scanned.Item.Kind != StorageItemKind.Folder))
-        {
-            var item = scanned.Item;
-            var path = scanned.RelativePath.ToString();
-            if (item.Kind == StorageItemKind.Shortcut || item.MimeType == GoogleNativeExportPolicy.GoogleShortcut)
-            {
-                items.Add(new(item.ItemId, item.Name, path, null, PreviewItemCategory.Skip, "Bỏ qua lối tắt", null,
-                    "Lối tắt được bỏ qua để tránh vòng lặp; mục đích không được tự động lần theo."));
-                continue;
-            }
-            if (item.Kind == StorageItemKind.ProviderNativeFile)
-            {
-                var decision = GoogleNativeExportPolicy.Decide(item.MimeType ?? string.Empty);
-                if (!decision.IsSupported)
-                {
-                    items.Add(new(item.ItemId, item.Name, path, null, PreviewItemCategory.Unsupported, "Không hỗ trợ", null, decision.VietnameseExplanation));
-                    continue;
-                }
-                exportCount++;
-                items.Add(new(item.ItemId, item.Name, path, null, PreviewItemCategory.Warning, $"Dự kiến xuất {decision.Extension}", item.Name + decision.Extension,
-                    decision.VietnameseExplanation + " Đây mới là kế hoạch; chưa có dữ liệu nào được xuất."));
-                continue;
-            }
-            items.Add(new(item.ItemId, item.Name, path, item.Size, PreviewItemCategory.Copy, "Đủ điều kiện", item.Name,
-                item.Size is null ? "Kích thước không được Google Drive cung cấp; chưa có nội dung nào được đọc." : "Đã đọc siêu dữ liệu; chưa có nội dung nào được tải xuống."));
-        }
+    private void InventoryScannerStateChanged(DriveInventoryScanState state) =>
+        _uiDispatcher.Invoke(() => ApplyInventoryScannerState(state));
 
-        return new BackupPreviewViewState(
-            sourcePath,
-            "Chưa có đích lưu trữ thực",
-            scan.FolderCount,
-            scan.FileCount,
-            scan.EstimatedBytes,
-            items.Count(item => item.Category is PreviewItemCategory.Copy or PreviewItemCategory.Warning),
-            items.Count(item => item.Category == PreviewItemCategory.Skip),
-            0,
-            exportCount,
-            items.Count(item => item.Category == PreviewItemCategory.Unsupported),
-            scan.VietnameseWarnings.Count + items.Count(item => item.Category is PreviewItemCategory.Warning or PreviewItemCategory.Unsupported),
-            scan.UnknownSizeCount,
-            items,
-            scan.VietnameseWarnings);
+    private void ApplyInventoryScannerState(DriveInventoryScanState state)
+    {
+        IsScanning = state.IsBusy;
+        ScanProgressText = state.VietnameseMessage;
+        if (state.Status == DriveInventoryScanStatus.Completed && state.LastSuccessfulRun is not null)
+        {
+            ApplyInventorySummary(state.LastSuccessfulRun);
+            ScanSuccessMessage = "Đã quét Google Drive thành công.";
+            ScanErrorMessage = null;
+        }
+        else if (state.Status is DriveInventoryScanStatus.Failed or DriveInventoryScanStatus.RequiresReauthentication or DriveInventoryScanStatus.Cancelled)
+        {
+            ScanErrorMessage = state.VietnameseMessage;
+            ScanSuccessMessage = null;
+        }
+    }
+
+    private void ApplyInventorySummary(DriveInventoryRun? run)
+    {
+        if (run?.CompletedAtUtc is not { } completed) return;
+        InventorySummary = new DriveInventorySummaryViewModel(
+            completed, run.TotalItems, run.FileCount, run.FolderCount, run.KnownBytes, run.UnknownSizeCount,
+            run.GoogleWorkspaceFileCount, run.ShortcutCount, run.UnresolvedCount, run.BackupEligibleCount,
+            run.StorageInformation?.StorageLimitBytes, run.StorageInformation?.TotalUsageBytes,
+            run.StorageInformation?.DriveUsageBytes, run.StorageInformation?.TrashUsageBytes);
     }
 
     private async Task StartBackupAsync(CancellationToken cancellationToken)
@@ -485,45 +500,6 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         Stage = BackupWorkflowStage.Result;
     }
 
-    private async Task RestoreRealSelectionAsync(CancellationToken cancellationToken)
-    {
-        if (_settings is null || string.IsNullOrWhiteSpace(_realGoogleAccountId)) return;
-        var accountId = await _settings.GetAsync("backup.google.source.account", cancellationToken);
-        var folderId = await _settings.GetAsync("backup.google.source.folder", cancellationToken);
-        var displayPath = await _settings.GetAsync("backup.google.source.path", cancellationToken);
-        if (string.Equals(accountId, _realGoogleAccountId, StringComparison.Ordinal) &&
-            !string.IsNullOrWhiteSpace(folderId) && !string.IsNullOrWhiteSpace(displayPath))
-        {
-            SourceFolder = new FolderSelectionViewModel("google-drive", accountId!, folderId, displayPath);
-        }
-    }
-
-    private async Task PersistRealSelectionAsync(CancellationToken cancellationToken)
-    {
-        if (_settings is null || SourceFolder is null) return;
-        await _settings.SetAsync("backup.google.source.account", SourceFolder.AccountId, cancellationToken);
-        await _settings.SetAsync("backup.google.source.folder", SourceFolder.FolderId, cancellationToken);
-        await _settings.SetAsync("backup.google.source.path", SourceFolder.DisplayPath, cancellationToken);
-    }
-
-    private Task PersistScanSummaryAsync(SourceScanResult scan, CancellationToken cancellationToken)
-    {
-        if (_settings is null) return Task.CompletedTask;
-        var summary = JsonSerializer.Serialize(new
-        {
-            completedAtUtc = DateTimeOffset.UtcNow,
-            scan.FileCount,
-            scan.FolderCount,
-            scan.EstimatedBytes,
-            scan.UnknownSizeCount,
-            scan.NativeFileCount,
-            scan.UnsupportedNativeFileCount,
-            scan.ShortcutCount,
-            warningCount = scan.VietnameseWarnings.Count
-        });
-        return _settings.SetAsync("backup.google.last-complete-scan-summary", summary, cancellationToken);
-    }
-
     private void ApplyPreviewFilter()
     {
         var query = _allPreviewItems.AsEnumerable();
@@ -558,6 +534,7 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
 
     public void Dispose()
     {
+        if (_inventoryScanner is not null) _inventoryScanner.StateChanged -= InventoryScannerStateChanged;
         _runCancellation?.Cancel(); _runCancellation?.Dispose();
         foreach (var command in new[] { SelectSourceCommand, SelectDestinationCommand, ScanCommand, StartBackupCommand, CancelCommand, RetryFailedCommand }.OfType<AsyncRelayCommand>()) command.Dispose();
     }

@@ -333,12 +333,16 @@ public sealed class GoogleAuthenticationTests
         public Task<GoogleAccountProfile> GetAccountProfileAsync(CancellationToken cancellationToken) => ProfileException is null
             ? Task.FromResult(Profile)
             : Task.FromException<GoogleAccountProfile>(ProfileException);
+        public Task<GoogleDriveStorageInformation> GetStorageInformationAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new GoogleDriveStorageInformation(null, null, null, null));
         public Task VerifyReadOnlyAccessAsync(CancellationToken cancellationToken)
         {
             VerificationCalls++;
             return VerificationException is null ? Task.CompletedTask : Task.FromException(VerificationException);
         }
         public Task<GoogleDriveMetadataPage> GetChildrenPageAsync(string parentItemId, string? pageToken, CancellationToken cancellationToken) =>
+            Task.FromResult(new GoogleDriveMetadataPage([], null));
+        public Task<GoogleDriveMetadataPage> GetInventoryPageAsync(string? pageToken, CancellationToken cancellationToken) =>
             Task.FromResult(new GoogleDriveMetadataPage([], null));
         public ValueTask DisposeAsync() { IsDisposed = true; return ValueTask.CompletedTask; }
     }

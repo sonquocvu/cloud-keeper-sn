@@ -137,6 +137,58 @@ public sealed class SqliteApplicationDatabase(SqliteConnectionFactory connection
             """),
         (2, """
             ALTER TABLE connected_accounts ADD COLUMN email TEXT NULL;
+            """),
+        (3, """
+            CREATE TABLE drive_scan_runs (
+                scan_id TEXT NOT NULL PRIMARY KEY,
+                provider_id TEXT NOT NULL,
+                provider_account_id TEXT NOT NULL,
+                started_at_utc TEXT NOT NULL,
+                completed_at_utc TEXT NULL,
+                status TEXT NOT NULL,
+                total_items INTEGER NOT NULL DEFAULT 0,
+                folder_count INTEGER NOT NULL DEFAULT 0,
+                file_count INTEGER NOT NULL DEFAULT 0,
+                known_bytes INTEGER NOT NULL DEFAULT 0,
+                unknown_size_count INTEGER NOT NULL DEFAULT 0,
+                google_workspace_count INTEGER NOT NULL DEFAULT 0,
+                shortcut_count INTEGER NOT NULL DEFAULT 0,
+                unresolved_count INTEGER NOT NULL DEFAULT 0,
+                backup_eligible_count INTEGER NOT NULL DEFAULT 0,
+                failure_category TEXT NULL,
+                is_complete INTEGER NOT NULL DEFAULT 0,
+                storage_limit_bytes INTEGER NULL,
+                total_usage_bytes INTEGER NULL,
+                drive_usage_bytes INTEGER NULL,
+                trash_usage_bytes INTEGER NULL
+            );
+
+            CREATE TABLE drive_scan_items (
+                scan_id TEXT NOT NULL,
+                file_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                parent_id TEXT NULL,
+                display_path TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                item_kind TEXT NOT NULL,
+                location TEXT NOT NULL,
+                file_size INTEGER NULL,
+                created_at_utc TEXT NULL,
+                modified_at_utc TEXT NULL,
+                md5_checksum TEXT NULL,
+                file_extension TEXT NULL,
+                shortcut_target_id TEXT NULL,
+                shortcut_target_mime_type TEXT NULL,
+                is_shared INTEGER NOT NULL,
+                is_owned_by_user INTEGER NULL,
+                backup_eligible INTEGER NOT NULL,
+                skip_reason TEXT NULL,
+                PRIMARY KEY(scan_id, file_id),
+                FOREIGN KEY(scan_id) REFERENCES drive_scan_runs(scan_id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_drive_scan_runs_latest ON drive_scan_runs(provider_account_id, is_complete, completed_at_utc DESC);
+            CREATE INDEX ix_drive_scan_items_path ON drive_scan_items(scan_id, display_path);
             """)
     ];
 

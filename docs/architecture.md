@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document describes the domain foundation, the real read-only Google Drive provider, and the isolated fake-provider UI showcase. Microsoft Graph remains intentionally absent.
+This document describes the domain foundation, the real read-only Google Drive inventory provider, and the isolated fake-provider UI showcase. Microsoft Graph remains intentionally absent.
 
 ## Dependency direction
 
@@ -33,7 +33,13 @@ Provider SDK models must remain inside their provider assembly. Application code
 
 The infrastructure uses `Microsoft.Data.Sqlite` directly rather than EF Core. The schema is small, explicit SQL is clearer for atomic state updates, and this avoids an ORM dependency while retaining numbered migrations. Initialization enables foreign keys, WAL journaling, and a busy timeout. Each queue-item update is atomic. On startup, in-flight `Downloading`, `Uploading`, or `Verifying` items are changed to `RetryPending`; they are never marked complete during recovery.
 
-Migration 1 creates tables for accounts (metadata only), backup definitions, runs, transfer items, mappings, export decisions, verification results, retry state, Vietnamese activity events, and application settings. File contents and thumbnails are never stored in SQLite.
+Migration 1 creates tables for accounts (metadata only), backup definitions, runs, transfer items, mappings, export decisions, verification results, retry state, Vietnamese activity events, and application settings. Migration 2 adds account email metadata. Migration 3 adds `drive_scan_runs` and `drive_scan_items`. A scan run begins incomplete, API pages are appended in bounded transactions, hierarchy paths are updated in bounded chunks, and a guarded final update publishes the run as complete. Startup changes abandoned `Scanning` rows to `Interrupted`; it never changes an earlier complete row. File contents, thumbnails, OAuth tokens, and client secrets are never stored in SQLite.
+
+## Drive inventory pipeline
+
+`IDriveInventorySource` is the provider boundary for `about.get` quota metadata and paged `files.list` metadata. `DriveInventoryScanner` owns the explicit lifecycle, single-scan gate, cancellation, safe diagnostics, counters, and staging snapshot. `DriveHierarchyBuilder` resolves parent IDs iteratively with memoized paths, so duplicate names remain legal and deep or cyclic graphs cannot recurse the process stack. `IDriveInventoryRepository` is the only persistence boundary used by the scanner.
+
+The scanner keeps only stable IDs and hierarchy nodes in memory; full item metadata is written one API page at a time. `DashboardViewModel`, `BackupViewModel`, and `HistoryViewModel` subscribe to the singleton scanner and marshal state changes through `IUiDispatcher`, allowing the active page and dashboard/history to refresh without navigation or restart.
 
 ## Streaming boundary
 
@@ -65,6 +71,6 @@ The WPF application uses a lightweight internal `INotifyPropertyChanged`/`IComma
 
 Semantic resource dictionaries provide light/dark/high-contrast themes, typography, spacing, and standard control states. `ThemeService` persists the preference, follows Windows theme changes in System mode and uses system colors in high contrast. `WindowPlacementService` persists bounds; `WindowPlacementValidator` restores off-screen windows to the visible desktop.
 
-`DemoDataService`, `DemoBackupPlanner`, and `DemoTransferEngine` are UI-development adapters around the existing fake providers. They are explicitly gated by `DemoConfiguration`, use deterministic scenarios, and never masquerade as live provider data. The guided workflow requires a preview and confirmation before the fake engine starts.
+`DemoDataService`, `DemoBackupPlanner`, and `DemoTransferEngine` are UI-development adapters around the existing fake providers. They are explicitly gated by `DemoConfiguration`, use deterministic scenarios, and never masquerade as live provider data. Production composition registers the real inventory scanner and does not register fake providers as `IStorageProvider`. The guided demo workflow requires a preview and confirmation before the fake engine starts.
 
 UI-facing statuses are mapped to natural Vietnamese by `VietnamesePresentationMapper`; internal enum names never need to appear in views. Diagnostic export redacts sensitive values before serialization.

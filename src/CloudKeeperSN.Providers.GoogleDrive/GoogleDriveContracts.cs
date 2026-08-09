@@ -2,6 +2,12 @@ namespace CloudKeeperSN.Providers.GoogleDrive;
 
 public sealed record GoogleAccountProfile(string AccountId, string DisplayName, string? EmailAddress);
 
+public sealed record GoogleDriveStorageInformation(
+    long? StorageLimitBytes,
+    long? TotalUsageBytes,
+    long? DriveUsageBytes,
+    long? TrashUsageBytes);
+
 public sealed record GoogleDriveItemMetadata(
     string Id,
     string Name,
@@ -14,7 +20,11 @@ public sealed record GoogleDriveItemMetadata(
     long? Version,
     string? ShortcutTargetId,
     string? ShortcutTargetMimeType,
-    bool? CanDownload);
+    bool? CanDownload,
+    bool IsTrashed = false,
+    string? FileExtension = null,
+    bool IsShared = false,
+    bool? IsOwnedByUser = null);
 
 public sealed record GoogleDriveMetadataPage(
     IReadOnlyList<GoogleDriveItemMetadata> Items,
@@ -24,8 +34,10 @@ public sealed record GoogleDriveMetadataPage(
 public interface IGoogleDriveSession : IAsyncDisposable
 {
     Task<GoogleAccountProfile> GetAccountProfileAsync(CancellationToken cancellationToken);
+    Task<GoogleDriveStorageInformation> GetStorageInformationAsync(CancellationToken cancellationToken);
     Task VerifyReadOnlyAccessAsync(CancellationToken cancellationToken);
     Task<GoogleDriveMetadataPage> GetChildrenPageAsync(string parentItemId, string? pageToken, CancellationToken cancellationToken);
+    Task<GoogleDriveMetadataPage> GetInventoryPageAsync(string? pageToken, CancellationToken cancellationToken);
 }
 
 public enum GoogleOAuthStage

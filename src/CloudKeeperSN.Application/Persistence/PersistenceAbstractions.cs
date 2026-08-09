@@ -1,5 +1,6 @@
 using CloudKeeperSN.Domain.Backup;
 using CloudKeeperSN.Domain.Storage;
+using CloudKeeperSN.Domain.Scanning;
 using CloudKeeperSN.Domain.Transfers;
 
 namespace CloudKeeperSN.Application.Persistence;
@@ -14,6 +15,24 @@ public interface IStorageAccountRepository
     Task UpsertAsync(StorageAccount account, CancellationToken cancellationToken);
     Task<IReadOnlyList<StorageAccount>> GetAllAsync(CancellationToken cancellationToken);
     Task RemoveAsync(string id, CancellationToken cancellationToken);
+}
+
+public interface IDriveInventoryRepository
+{
+    Task RecoverInterruptedAsync(DateTimeOffset interruptedAtUtc, CancellationToken cancellationToken);
+    Task BeginAsync(DriveInventoryRun run, CancellationToken cancellationToken);
+    Task AppendBatchAsync(Guid scanId, IReadOnlyList<DriveInventoryItem> items, CancellationToken cancellationToken);
+    Task UpdateHierarchyAsync(Guid scanId, DriveHierarchyResult hierarchy, CancellationToken cancellationToken);
+    Task CompleteAsync(DriveInventoryRun completedRun, CancellationToken cancellationToken);
+    Task MarkIncompleteAsync(Guid scanId, DriveInventoryRunStatus status, DateTimeOffset completedAtUtc, string? failureCategory, CancellationToken cancellationToken);
+    Task<DriveInventoryRun?> GetLatestSuccessfulAsync(string providerAccountId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DriveInventoryRun>> GetRecentAsync(int maximumCount, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DriveInventoryItem>> GetItemsAsync(Guid scanId, int maximumCount, CancellationToken cancellationToken);
+}
+
+public sealed class DriveInventoryPersistenceException : Exception
+{
+    public DriveInventoryPersistenceException(string message, Exception innerException) : base(message, innerException) { }
 }
 
 public interface ITransferMappingRepository

@@ -1,5 +1,6 @@
 using CloudKeeperSN.Domain.Storage;
 using CloudKeeperSN.Domain.Transfers;
+using Google.Apis.Http;
 
 namespace CloudKeeperSN.Providers.GoogleDrive;
 
@@ -29,7 +30,10 @@ public sealed class GoogleRequestExecutor
         _jitter = jitter ?? Random.Shared.NextDouble;
     }
 
-    public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    public async Task<T> ExecuteAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken,
+        Func<TimeSpan?>? retryAfterProvider = null)
     {
         var completedAttempts = 0;
         while (true)
@@ -47,7 +51,8 @@ public sealed class GoogleRequestExecutor
             {
                 var failure = GoogleProviderExceptionMapper.Map(exception);
                 if (!IsTransient(failure.Category)) throw failure;
-                var decision = _retryPolicy.Decide(completedAttempts, failure.RetryAfter, _jitter());
+                var retryAfter = failure.RetryAfter ?? retryAfterProvider?.Invoke();
+                var decision = _retryPolicy.Decide(completedAttempts, retryAfter, _jitter());
                 if (!decision.ShouldRetry) throw failure;
                 completedAttempts = decision.NextAttempt;
                 await _delay.WaitAsync(decision.Delay, cancellationToken);
@@ -60,4 +65,27 @@ public sealed class GoogleRequestExecutor
         ProviderFailureCategory.RequestTimedOut or
         ProviderFailureCategory.ProviderThrottled or
         ProviderFailureCategory.ServiceUnavailable;
+}
+
+internal sealed class GoogleRetryAfterCapture(Func<DateTimeOffset>? utcNow = null) : IHttpUnsuccessfulResponseHandler
+{
+    private readonly AsyncLocal<TimeSpan?> _captured = new();
+    private readonly Func<DateTimeOffset> _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
+
+    public Task<bool> HandleResponseAsync(HandleUnsuccessfulResponseArgs args)
+    {
+        var retry = args.Response.Headers.RetryAfter;
+        var value = retry?.Delta ?? (retry?.Date is { } date ? date - _utcNow() : null);
+        _captured.Value = value > TimeSpan.Zero ? value : null;
+        return Task.FromResult(false);
+    }
+
+    public void Reset() => _captured.Value = null;
+
+    public TimeSpan? Consume()
+    {
+        var value = _captured.Value;
+        _captured.Value = null;
+        return value;
+    }
 }

@@ -2,7 +2,7 @@
 
 ## Direction and confirmation
 
-The intended direction is Google Drive → a future destination. Google Drive is source-only. The current production scan builds a metadata-only preview containing file/folder counts, known estimated bytes, explicit unknown-size counts, warnings and export decisions.
+The intended direction is Google Drive → a future destination. Google Drive is source-only. The current production action builds a local metadata inventory summary containing regular-file/folder/Workspace/shortcut counts, known bytes, explicit unknown-size counts, unresolved items, quota metadata and future eligibility. It does not create a transfer preview or export decision that can execute.
 
 No real destination or transfer exists in this build. The start action is disabled and explains that no file has been downloaded, exported or transmitted. OneDrive transfer remains available only in clearly labelled demo mode.
 
@@ -37,4 +37,4 @@ The default chooses the strongest compatible evidence available: strong equal ha
 
 ## Recovery and retry
 
-Persistent demo transfer states are validated. Interrupted downloading/uploading/verifying work becomes `RetryPending` on restart. Real Google metadata requests retry only transient categories with bounded exponential backoff and jitter; cancellation interrupts backoff. The current SDK mapping does not extract `Retry-After`, so future transfer work must add and test that header mapping before relying on it.
+Persistent demo transfer states are validated. Interrupted downloading/uploading/verifying work becomes `RetryPending` on restart. Real Google metadata requests retry only transient network, timeout, throttle and service-unavailable categories with bounded exponential backoff and jitter. An HTTP `Retry-After` delta or date is captured before the Google SDK creates its exception and takes precedence over calculated delay. Cancellation interrupts both API calls and backoff.

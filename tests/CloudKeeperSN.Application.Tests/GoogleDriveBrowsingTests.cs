@@ -1,5 +1,6 @@
 using CloudKeeperSN.Application.Persistence;
 using CloudKeeperSN.Application.Storage;
+using CloudKeeperSN.Domain.Scanning;
 using CloudKeeperSN.Domain.Storage;
 using CloudKeeperSN.Providers.GoogleDrive;
 using CloudKeeperSN.Providers.GoogleDrive.Authentication;
@@ -61,8 +62,66 @@ public sealed class GoogleDriveBrowsingTests
         Assert.Equal(2, results.Select(item => item.ItemId).Distinct().Count());
     }
 
+    [Fact]
+    public async Task InventoryMapsKindsSharedMetadataAndExcludesTrashedItemsDefensively()
+    {
+        var session = new PagingSession
+        {
+            InventoryPage = new GoogleDriveMetadataPage([
+                Metadata("file", "Dữ liệu_日本語.txt", "text/plain", size: null, checksum: null),
+                Metadata("folder", "Tài liệu", GoogleDriveProvider.FolderMimeType),
+                Metadata("native", "Kế hoạch", "application/vnd.google-apps.document"),
+                Metadata("shortcut", "Lối tắt", "application/vnd.google-apps.shortcut", targetId: "file"),
+                Metadata("shared", "Được chia sẻ.pdf", "application/pdf", size: 12, shared: true, owned: false),
+                Metadata("trash", "Trong thùng rác.txt", "text/plain", trashed: true)
+            ], "next")
+        };
+        await using var authentication = await CreateAuthenticationAsync(session);
+        var provider = new GoogleDriveProvider(authentication, new NullDiagnostics());
+
+        var result = await provider.GetInventoryPageAsync(Guid.NewGuid(), "account", null, CancellationToken.None);
+
+        Assert.Equal(5, result.Items.Count);
+        Assert.DoesNotContain(result.Items, item => item.FileId == "trash");
+        Assert.Equal(DriveInventoryItemKind.File, result.Items.Single(item => item.FileId == "file").Kind);
+        Assert.Equal(DriveInventoryItemKind.Folder, result.Items.Single(item => item.FileId == "folder").Kind);
+        Assert.Equal(DriveInventoryItemKind.GoogleWorkspaceFile, result.Items.Single(item => item.FileId == "native").Kind);
+        Assert.Equal(DriveInventoryItemKind.Shortcut, result.Items.Single(item => item.FileId == "shortcut").Kind);
+        Assert.Equal(DriveInventoryLocation.Shared, result.Items.Single(item => item.FileId == "shared").Location);
+        Assert.Equal("file", result.Items.Single(item => item.FileId == "shortcut").ShortcutTargetId);
+        Assert.Equal("next", result.NextPageToken);
+    }
+
+    [Fact]
+    public async Task InventoryReturnsStorageQuotaMetadata()
+    {
+        var session = new PagingSession { Storage = new GoogleDriveStorageInformation(1000, 500, 400, 20) };
+        await using var authentication = await CreateAuthenticationAsync(session);
+        var provider = new GoogleDriveProvider(authentication, new NullDiagnostics());
+
+        var storage = await provider.GetStorageInformationAsync(CancellationToken.None);
+
+        Assert.Equal(1000, storage.StorageLimitBytes);
+        Assert.Equal(500, storage.TotalUsageBytes);
+        Assert.Equal(400, storage.DriveUsageBytes);
+        Assert.Equal(20, storage.TrashUsageBytes);
+    }
+
     private static GoogleDriveItemMetadata Folder(string id, string name) => new(
         id, name, GoogleDriveProvider.FolderMimeType, ["root"], null, null, null, null, null, null, null, null);
+
+    private static GoogleDriveItemMetadata Metadata(
+        string id,
+        string name,
+        string mimeType,
+        long? size = null,
+        string? checksum = null,
+        string? targetId = null,
+        bool shared = false,
+        bool? owned = true,
+        bool trashed = false) => new(
+            id, name, mimeType, ["root"], size, null, null, checksum, null, targetId, null, true,
+            trashed, null, shared, owned);
 
     private static async Task<GoogleAuthenticationService> CreateAuthenticationAsync(IGoogleDriveSession session)
     {
@@ -82,9 +141,15 @@ public sealed class GoogleDriveBrowsingTests
     {
         private int _index;
         public List<string?> ReceivedTokens { get; } = [];
+        public GoogleDriveMetadataPage InventoryPage { get; set; } = new([], null);
+        public GoogleDriveStorageInformation Storage { get; set; } = new(null, null, null, null);
         public Task<GoogleAccountProfile> GetAccountProfileAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new GoogleAccountProfile("account", "Tài khoản", "drive@example.test"));
+        public Task<GoogleDriveStorageInformation> GetStorageInformationAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(Storage);
         public Task VerifyReadOnlyAccessAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<GoogleDriveMetadataPage> GetInventoryPageAsync(string? pageToken, CancellationToken cancellationToken) =>
+            Task.FromResult(InventoryPage);
         public Task<GoogleDriveMetadataPage> GetChildrenPageAsync(string parentItemId, string? pageToken, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

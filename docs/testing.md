@@ -13,9 +13,9 @@ Các test mặc định hoàn toàn ngoại tuyến, không mở GUI và không 
 ## Coverage trọng yếu
 
 - **Domain:** đường dẫn/identity, tên conflict xác định, native export policy, checksum, retry, state machine, redaction và cycle guard.
-- **Application/provider:** parse/validate Desktop OAuth JSON, giới hạn kích thước, loại credential sai, endpoint/redirect, protected configuration restore, precedence, callback/state stages, token-persistence ordering, account identity, Drive read-only verification, chống sign-in đồng thời, hủy/cleanup cục bộ, retry sau lỗi và chống late-restore overwrite; capability chỉ đọc, pagination nhiều trang/trang rỗng/token lặp, query escaping, duplicate ID, scan đệ quy, shortcut, native/unsupported/unknown-size, progress/cancellation và retry transient/non-transient.
-- **Infrastructure:** migration SQLite, email metadata, recovery, redaction, protected credential round-trip, plaintext không xuất hiện trên disk và lỗi giải mã an toàn.
-- **App:** navigation, accessibility-facing states, Settings OAuth picker/import/replace/remove/help với fake picker/dialog/protected manager, cập nhật Connect ngay trong phiên, dispatcher-bound account publication, name/email/success state và `CanExecuteChanged`, folder picker loading/error/cancel, demo workflow và production metadata preview; partial scan không được publish; transfer thật luôn bị vô hiệu hóa.
+- **Application/provider:** OAuth lifecycle; capability chỉ đọc; inventory rỗng/một trang/nhiều trang/token lặp; tên trùng/Unicode; thiếu size/checksum; regular/folder/Workspace/shortcut/shared/trash; missing parent/cycle/depth 5.000; cancellation giữa trang; concurrent scan; auth revoked; database failure/retry; transient/non-transient retry, `Retry-After`, và hủy trong backoff.
+- **Infrastructure:** migration SQLite và dữ liệu account cũ; staged/complete inventory, item/path/quota round-trip, batching, failed snapshot preservation, startup interruption recovery, schema không có token/secret; recovery/redaction/protected credential.
+- **App:** production scan enable/disable, progress item count, busy/cancel/retry command state, property/command notifications, dispatcher use, previous-summary preservation, immediate dashboard refresh, navigation/accessibility, Settings OAuth, folder picker and isolated demo workflow. Transfer thật luôn bị vô hiệu hóa.
 
 Các test import dùng file reader, clock, protected store, authentication và dialog giả; không gọi Windows DPAPI, browser, Google hoặc file picker tương tác. Infrastructure tests riêng xác nhận protected blob không chứa plaintext trên disk và lỗi giải mã được xử lý an toàn.
 
@@ -25,4 +25,4 @@ Chưa có live integration test tự động. Nếu bổ sung, phải đặt ở
 
 ## Manual checks deferred
 
-Automated suite không thể xác nhận trực quan hoặc tương tác thật với browser OAuth. Checklist thủ công nằm tại [ui-readiness-checklist.md](ui-readiness-checklist.md). Trong lần triển khai này, các mục đó được ghi rõ là **chưa thực hiện**, không được báo cáo như đã pass.
+Automated suite không thể xác nhận trực quan, tương tác thật với browser OAuth, số mục thật hoặc quota thật. Checklist scan nằm tại [drive-inventory.md](drive-inventory.md#manual-windows-verification) và checklist UI chung tại [ui-readiness-checklist.md](ui-readiness-checklist.md). Các mục đó phải được ghi rõ là **chưa thực hiện** cho đến khi developer chạy bằng tài khoản đã kết nối.

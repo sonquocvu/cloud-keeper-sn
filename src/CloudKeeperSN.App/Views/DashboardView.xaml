@@ -7,8 +7,8 @@
         <StackPanel Margin="{StaticResource PagePadding}">
             <Grid Margin="0,0,0,20">
                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <StackPanel><TextBlock Text="Sao lưu an toàn, rõ ràng và có kiểm soát" Style="{StaticResource SectionTitleText}"/><TextBlock Text="Google Drive là nguồn • OneDrive là nơi lưu bản sao • Không xóa dữ liệu nguồn" Style="{StaticResource SupportingText}" Margin="0,5,0,0"/></StackPanel>
-                <Button Grid.Column="1" Content="_Tạo bản sao lưu" Style="{StaticResource PrimaryButton}" Command="{Binding CreateBackupCommand}" automation:AutomationProperties.Name="Tạo bản sao lưu"/>
+                <StackPanel><TextBlock Text="{Binding HeaderTitle}" Style="{StaticResource SectionTitleText}"/><TextBlock Text="{Binding HeaderSubtitle}" Style="{StaticResource SupportingText}" Margin="0,5,0,0"/></StackPanel>
+                <Button Grid.Column="1" Content="{Binding PrimaryActionText}" Style="{StaticResource PrimaryButton}" Command="{Binding CreateBackupCommand}" automation:AutomationProperties.Name="Mở trang quét hoặc sao lưu"/>
             </Grid>
 
             <UniformGrid Columns="4" Margin="0,0,-12,24">
@@ -20,7 +20,7 @@
 
             <TextBlock Text="Hoạt động gần đây" Style="{StaticResource SectionTitleText}" Margin="0,0,0,14" automation:AutomationProperties.HeadingLevel="Level2"/>
             <Border Style="{StaticResource Card}" Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <controls:EmptyState Title="Chưa có lần sao lưu nào" Message="Kết nối hai tài khoản rồi tạo bản sao lưu đầu tiên. Bạn luôn được xem trước trước khi dữ liệu được truyền." IconGlyph="\uE81C" ActionText="Tạo bản sao lưu" ActionCommand="{Binding CreateBackupCommand}"/>
+                <controls:EmptyState Title="Chưa có hoạt động nào" Message="Kết nối Google Drive và tạo danh mục siêu dữ liệu đầu tiên. Không có nội dung tệp nào được tải xuống." IconGlyph="\uE81C" ActionText="Mở trang quét" ActionCommand="{Binding CreateBackupCommand}"/>
             </Border>
             <ListBox ItemsSource="{Binding RecentRuns}" Visibility="{Binding IsEmpty, Converter={StaticResource InverseBooleanToVisibilityConverter}}" automation:AutomationProperties.Name="Danh sách hoạt động sao lưu gần đây">
                 <ListBox.ItemTemplate>
@@ -46,4 +46,3 @@
         </StackPanel>
     </ScrollViewer>
 </UserControl>
-

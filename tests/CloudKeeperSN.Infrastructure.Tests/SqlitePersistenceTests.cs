@@ -1,4 +1,5 @@
 using CloudKeeperSN.Domain.Backup;
+using CloudKeeperSN.Domain.Scanning;
 using CloudKeeperSN.Domain.Transfers;
 using CloudKeeperSN.Infrastructure.Persistence;
 
@@ -74,6 +75,102 @@ public sealed class SqlitePersistenceTests : IAsyncDisposable
         Assert.DoesNotContain("super-secret", events[0].TechnicalDetails);
     }
 
+    [Fact]
+    public async Task DriveInventory_CommitsItemsAndStorageOnlyWhenSnapshotCompletes()
+    {
+        var repository = new SqliteDriveInventoryRepository(_database, _factory);
+        var staging = InventoryRun(Guid.NewGuid());
+        var item = new DriveInventoryItem(staging.ScanId, "file-1", "Báo cáo.pdf", "root", "pending",
+            "application/pdf", DriveInventoryItemKind.File, DriveInventoryLocation.MyDrive, 42,
+            DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow, "abc", "pdf", null, null,
+            false, true, true, null);
+
+        await repository.BeginAsync(staging, CancellationToken.None);
+        await repository.AppendBatchAsync(staging.ScanId, [item], CancellationToken.None);
+        await repository.UpdateHierarchyAsync(staging.ScanId,
+            new DriveHierarchyResult(new Dictionary<string, (string Path, DriveInventoryLocation Location)>
+            {
+                [item.FileId] = ("Drive của tôi/Báo cáo.pdf", DriveInventoryLocation.MyDrive)
+            }, 0), CancellationToken.None);
+        var completed = staging with
+        {
+            CompletedAtUtc = DateTimeOffset.UtcNow,
+            Status = DriveInventoryRunStatus.Completed,
+            TotalItems = 1,
+            FileCount = 1,
+            KnownBytes = 42,
+            BackupEligibleCount = 1,
+            IsComplete = true,
+            StorageInformation = new DriveStorageInformation(1_000, 500, 400, 20)
+        };
+        await repository.CompleteAsync(completed, CancellationToken.None);
+
+        var restored = await repository.GetLatestSuccessfulAsync("account", CancellationToken.None);
+        var restoredItem = Assert.Single(await repository.GetItemsAsync(staging.ScanId, 10, CancellationToken.None));
+        Assert.Equal(completed, restored);
+        Assert.Equal("Drive của tôi/Báo cáo.pdf", restoredItem.DisplayPath);
+        Assert.Equal(42, restoredItem.Size);
+    }
+
+    [Fact]
+    public async Task DriveInventory_IncompleteRunDoesNotReplacePreviousSuccessfulSnapshot()
+    {
+        var repository = new SqliteDriveInventoryRepository(_database, _factory);
+        var previous = InventoryRun(Guid.NewGuid()) with
+        {
+            CompletedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+            Status = DriveInventoryRunStatus.Completed,
+            TotalItems = 7,
+            FileCount = 7,
+            IsComplete = true
+        };
+        await repository.BeginAsync(previous with { Status = DriveInventoryRunStatus.Scanning, IsComplete = false }, CancellationToken.None);
+        await repository.CompleteAsync(previous, CancellationToken.None);
+
+        var failed = InventoryRun(Guid.NewGuid()) with { StartedAtUtc = DateTimeOffset.UtcNow };
+        await repository.BeginAsync(failed, CancellationToken.None);
+        await repository.MarkIncompleteAsync(failed.ScanId, DriveInventoryRunStatus.Failed, DateTimeOffset.UtcNow,
+            "NetworkUnavailable", CancellationToken.None);
+
+        var latest = await repository.GetLatestSuccessfulAsync("account", CancellationToken.None);
+        var runs = await repository.GetRecentAsync(10, CancellationToken.None);
+        Assert.Equal(previous.ScanId, latest!.ScanId);
+        Assert.Contains(runs, run => run.ScanId == failed.ScanId && !run.IsComplete && run.Status == DriveInventoryRunStatus.Failed);
+    }
+
+    [Fact]
+    public async Task DriveInventory_StartupRecoveryMarksOnlyStagingRunsInterrupted()
+    {
+        var repository = new SqliteDriveInventoryRepository(_database, _factory);
+        var staging = InventoryRun(Guid.NewGuid());
+        await repository.BeginAsync(staging, CancellationToken.None);
+
+        await repository.RecoverInterruptedAsync(DateTimeOffset.UtcNow, CancellationToken.None);
+
+        var recovered = Assert.Single(await repository.GetRecentAsync(10, CancellationToken.None));
+        Assert.Equal(DriveInventoryRunStatus.Interrupted, recovered.Status);
+        Assert.False(recovered.IsComplete);
+        Assert.Equal("ApplicationShutdown", recovered.FailureCategory);
+    }
+
+    [Fact]
+    public async Task DriveInventorySchemaContainsMetadataButNoCredentialColumns()
+    {
+        await _database.InitializeAsync(CancellationToken.None);
+        await using var connection = await _factory.OpenAsync(CancellationToken.None);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(drive_scan_items)";
+        var columns = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken.None);
+        while (await reader.ReadAsync(CancellationToken.None)) columns.Add(reader.GetString(1));
+
+        Assert.Contains("file_id", columns);
+        Assert.Contains("display_path", columns);
+        Assert.DoesNotContain(columns, name => name.Contains("token", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(columns, name => name.Contains("secret", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(columns, name => name.Contains("credential", StringComparison.OrdinalIgnoreCase));
+    }
+
     private async Task SeedBackupRunAsync()
     {
         await _database.InitializeAsync(CancellationToken.None);
@@ -107,6 +204,10 @@ public sealed class SqlitePersistenceTests : IAsyncDisposable
         State = state,
         RetryCount = 0
     };
+
+    private static DriveInventoryRun InventoryRun(Guid scanId) => new(
+        scanId, "google-drive", "account", DateTimeOffset.UtcNow.AddMinutes(-2), null,
+        DriveInventoryRunStatus.Scanning, 0, 0, 0, 0, 0, 0, 0, 0, 0, null, false, null);
 
     public ValueTask DisposeAsync()
     {

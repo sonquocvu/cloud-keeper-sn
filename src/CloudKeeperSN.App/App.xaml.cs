@@ -3,6 +3,7 @@ using System.Windows;
 using CloudKeeperSN.Application.Persistence;
 using CloudKeeperSN.Application.Recovery;
 using CloudKeeperSN.Application.Storage;
+using CloudKeeperSN.Application.Scanning;
 using CloudKeeperSN.App.ViewModels;
 using CloudKeeperSN.App.UI.Theming;
 using CloudKeeperSN.App.UI.Windowing;
@@ -54,6 +55,9 @@ public partial class App : System.Windows.Application
             services.AddSingleton<IProviderAuthenticationService>(provider => provider.GetRequiredService<GoogleAuthenticationService>());
             services.AddSingleton<GoogleDriveProvider>();
             services.AddSingleton<IStorageProvider>(provider => provider.GetRequiredService<GoogleDriveProvider>());
+            services.AddSingleton<IDriveInventorySource>(provider => provider.GetRequiredService<GoogleDriveProvider>());
+            services.AddSingleton<DriveInventoryScanner>();
+            services.AddSingleton<IDriveInventoryScanner>(provider => provider.GetRequiredService<DriveInventoryScanner>());
         }
         services.AddSingleton<DemoDataService>();
         services.AddSingleton<DemoBackupPlanner>();
@@ -68,14 +72,33 @@ public partial class App : System.Windows.Application
         services.AddSingleton<TransferRecoveryService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IWindowPlacementService, WindowPlacementService>();
-        services.AddSingleton<DashboardViewModel>();
+        services.AddSingleton(provider => new DashboardViewModel(
+            provider.GetRequiredService<DemoDataService>(),
+            demoConfiguration.IsEnabled,
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IProviderAuthenticationService>(),
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IDriveInventoryScanner>(),
+            provider.GetRequiredService<IUiDispatcher>()));
         services.AddSingleton(provider => new AccountsViewModel(
             provider.GetRequiredService<DemoDataService>(),
             provider.GetRequiredService<IDialogService>(),
             demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IProviderAuthenticationService>(),
             provider.GetRequiredService<IUiDispatcher>()));
-        services.AddSingleton<BackupViewModel>();
-        services.AddSingleton<HistoryViewModel>();
+        services.AddSingleton(provider => new BackupViewModel(
+            provider.GetRequiredService<DemoDataService>(),
+            provider.GetRequiredService<DemoBackupPlanner>(),
+            provider.GetRequiredService<DemoTransferEngine>(),
+            provider.GetRequiredService<IFolderPickerService>(),
+            provider.GetRequiredService<IDialogService>(),
+            demoConfiguration,
+            provider.GetServices<IStorageProvider>(),
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IDriveInventoryScanner>(),
+            provider.GetRequiredService<IUiDispatcher>()));
+        services.AddSingleton(provider => new HistoryViewModel(
+            provider.GetRequiredService<DemoDataService>(),
+            provider.GetRequiredService<IDiagnosticExportService>(),
+            demoConfiguration.IsEnabled,
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IDriveInventoryScanner>(),
+            provider.GetRequiredService<IUiDispatcher>()));
         services.AddSingleton(provider => new SettingsViewModel(
             provider.GetRequiredService<IThemeService>(),
             provider.GetRequiredService<IApplicationSettingRepository>(),
@@ -104,6 +127,8 @@ public partial class App : System.Windows.Application
             if (!demoConfiguration.IsEnabled)
             {
                 await _serviceProvider.GetRequiredService<IGoogleOAuthConfigurationManager>()
+                    .InitializeAsync(CancellationToken.None);
+                await _serviceProvider.GetRequiredService<IDriveInventoryScanner>()
                     .InitializeAsync(CancellationToken.None);
             }
             await _serviceProvider.GetRequiredService<TransferRecoveryService>().RecoverAsync(CancellationToken.None);

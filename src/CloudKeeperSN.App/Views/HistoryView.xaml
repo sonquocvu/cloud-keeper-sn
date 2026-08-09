@@ -9,39 +9,38 @@
                 <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" automation:AutomationProperties.Name="Tìm trong lịch sử" ToolTip="Tìm theo tên hoặc thư mục" Margin="0,0,10,0"/>
                 <ComboBox Grid.Column="1" ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding SelectedStatusFilter}" DisplayMemberPath="Label" automation:AutomationProperties.Name="Lọc theo trạng thái" Margin="0,0,10,0"/>
                 <ComboBox Grid.Column="2" ItemsSource="{Binding DateFilters}" SelectedItem="{Binding SelectedDateFilter}" DisplayMemberPath="Label" automation:AutomationProperties.Name="Lọc theo ngày" Margin="0,0,10,0"/>
-                <Button Grid.Column="3" Content="Xuất thông tin chẩn đoán" Command="{Binding ExportCommand}" ToolTip="Token và thông tin nhạy cảm sẽ được ẩn"/>
+                <Button Grid.Column="3" Content="Xuất thông tin chẩn đoán" Command="{Binding ExportCommand}" ToolTip="Chẩn đoán thật được xuất trong Cài đặt; token và thông tin nhạy cảm luôn được ẩn"/>
             </Grid>
         </Border>
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions><ColumnDefinition Width="5*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="4*"/></Grid.ColumnDefinitions>
             <Border Style="{StaticResource Card}" Padding="10">
                 <Grid>
-                    <ListBox ItemsSource="{Binding VisibleRuns}" SelectedItem="{Binding SelectedRun}" automation:AutomationProperties.Name="Các lần sao lưu, mới nhất trước">
+                    <ListBox ItemsSource="{Binding VisibleRuns}" SelectedItem="{Binding SelectedRun}" automation:AutomationProperties.Name="Các hoạt động gần đây, mới nhất trước">
                         <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
                         <ListBox.ItemTemplate><DataTemplate><Border BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1" Padding="10,12"><StackPanel>
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Source.Name}" Style="{StaticResource CardTitleText}"/><controls:StatusBadge Grid.Column="1" Text="{Binding Status.Text}" Tone="{Binding Status.Tone}"/></Grid>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Name}" Style="{StaticResource CardTitleText}"/><controls:StatusBadge Grid.Column="1" Text="{Binding Status.Text}" Tone="{Binding Status.Tone}"/></Grid>
                             <TextBlock Text="{Binding Route}" Style="{StaticResource SupportingText}" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
                             <WrapPanel Margin="0,9,0,0"><TextBlock Text="{Binding StartLabel}" Style="{StaticResource CaptionText}" Margin="0,0,14,0"/><TextBlock Text="{Binding DurationLabel}" Style="{StaticResource CaptionText}" Margin="0,0,14,0"/><TextBlock Text="{Binding FileSummary}" Style="{StaticResource CaptionText}" Margin="0,0,14,0"/><TextBlock Text="{Binding Capacity}" Style="{StaticResource CaptionText}"/></WrapPanel>
                         </StackPanel></Border></DataTemplate></ListBox.ItemTemplate>
                     </ListBox>
-                    <controls:EmptyState Title="Không tìm thấy lịch sử phù hợp" Message="Thử thay đổi từ khóa hoặc bộ lọc. Lịch sử sao lưu chưa bị xóa." IconGlyph="\uE81C" Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <controls:EmptyState Title="Không tìm thấy lịch sử phù hợp" Message="Thử thay đổi từ khóa hoặc bộ lọc. Dữ liệu lịch sử chưa bị xóa." IconGlyph="\uE81C" Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
             </Border>
             <Border Grid.Column="2" Style="{StaticResource Card}" Padding="20">
                 <Grid>
                     <StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Chi tiết lần sao lưu" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
-                        <TextBlock Text="{Binding SelectedRun.Source.Name}" Style="{StaticResource CardTitleText}" Margin="0,16,0,0"/>
+                        <TextBlock Text="Chi tiết hoạt động" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
+                        <TextBlock Text="{Binding SelectedRun.Name}" Style="{StaticResource CardTitleText}" Margin="0,16,0,0"/>
                         <TextBlock Text="{Binding SelectedRun.Route}" Style="{StaticResource SupportingText}" Margin="0,4,0,0"/>
                         <StackPanel Orientation="Horizontal" Margin="0,12,0,0"><controls:StatusBadge Text="{Binding SelectedRun.Status.Text}" Tone="{Binding SelectedRun.Status.Tone}"/><controls:StatusBadge Text="{Binding SelectedRun.Verification.Text}" Tone="{Binding SelectedRun.Verification.Tone}" Margin="8,0,0,0"/></StackPanel>
                         <TextBlock Text="Dòng hoạt động" Style="{StaticResource CardTitleText}" Margin="0,22,0,10"/>
-                        <ItemsControl ItemsSource="{Binding SelectedRun.Source.Timeline}"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="●" Foreground="{DynamicResource Information}" FontSize="9" VerticalAlignment="Top" Margin="0,4,0,0"/><TextBlock Grid.Column="1" Text="{Binding}" Style="{StaticResource SupportingText}"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                        <ItemsControl ItemsSource="{Binding SelectedRun.Timeline}"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="●" Foreground="{DynamicResource Information}" FontSize="9" VerticalAlignment="Top" Margin="0,4,0,0"/><TextBlock Grid.Column="1" Text="{Binding}" Style="{StaticResource SupportingText}"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
                         <TextBlock Text="Thông tin kỹ thuật nhạy cảm không được hiển thị trong lịch sử." Style="{StaticResource CaptionText}" Margin="0,8,0,0"/>
                     </StackPanel>
-                    <controls:EmptyState Title="Chọn một lần sao lưu" Message="Chi tiết, mức xác minh và dòng hoạt động sẽ hiển thị tại đây." IconGlyph="\uE946" Visibility="{Binding HasSelection, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                    <controls:EmptyState Title="Chọn một hoạt động" Message="Chi tiết, trạng thái và dòng hoạt động sẽ hiển thị tại đây." IconGlyph="\uE946" Visibility="{Binding HasSelection, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
                 </Grid>
             </Border>
         </Grid>
     </Grid>
 </UserControl>
-

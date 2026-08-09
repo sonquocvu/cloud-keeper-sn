@@ -2,7 +2,7 @@
 
 CloudKeeperSN là ứng dụng WPF cho Windows 10/11. Bản dựng hiện tại có hai chế độ tách biệt:
 
-- **Chế độ thực:** đăng nhập Google Drive bằng trình duyệt hệ thống, duyệt thư mục, quét đệ quy siêu dữ liệu và lập bản xem trước. Google Drive là nguồn **chỉ đọc tuyệt đối**.
+- **Chế độ thực:** đăng nhập Google Drive bằng trình duyệt hệ thống và tạo danh mục metadata toàn Drive trong SQLite. Google Drive là nguồn **chỉ đọc tuyệt đối**.
 - **Chế độ trình diễn:** dùng provider giả để trình diễn toàn bộ luồng Google Drive → OneDrive mà không truy cập dịch vụ thật.
 
 Trong chế độ thực chưa có đích lưu trữ và chưa có truyền dữ liệu. Nút **Bắt đầu sao lưu** bị vô hiệu hóa với giải thích rõ ràng. Ứng dụng không gọi API tải xuống/xuất nội dung và không cung cấp khả năng ghi, xóa, di chuyển hoặc đổi tên trên Google Drive.
@@ -14,10 +14,11 @@ Trong chế độ thực chưa có đích lưu trữ và chưa có truyền dữ
 - đúng một scope Google: `https://www.googleapis.com/auth/drive.readonly`;
 - token được DPAPI bảo vệ theo Windows CurrentUser; SQLite chỉ lưu metadata tài khoản;
 - trạng thái kết nối/hủy/lỗi/đăng nhập lại và ngắt kết nối có xác nhận;
-- duyệt `Drive của tôi` theo trang, hủy/thử lại, chặn continuation token lặp;
-- quét đệ quy metadata-only, nhận diện duplicate theo item ID, shortcut, kích thước chưa rõ và lỗi một phần;
+- quét toàn bộ metadata không nằm trong thùng rác bằng `files.list` 1.000 mục/trang và đọc quota bằng `about.get`;
+- snapshot SQLite dạng staging, chỉ công bố sau khi mọi trang và cấu trúc thư mục hoàn tất; lần quét thành công trước sống sót khi hủy/lỗi/tắt ứng dụng;
+- nhận diện bằng file ID, giữ tên trùng/Unicode, phân loại tệp thường, thư mục, Google Workspace, shortcut, shared, thiếu kích thước và parent không hợp lệ;
 - kế hoạch Google Docs → `.docx`, Sheets → `.xlsx`, Slides → `.pptx`, Drawings → `.png`; loại native khác được đánh dấu không hỗ trợ;
-- retry có exponential backoff, jitter, giới hạn và tôn trọng hủy;
+- retry có exponential backoff, jitter, giới hạn, tôn trọng `Retry-After` và hủy;
 - theme sáng/tối/theo Windows/high contrast, nhãn trạng thái bằng chữ và hỗ trợ bàn phím;
 - SQLite có migration, lịch sử, cài đặt và chẩn đoán được redaction;
 - bộ provider giả và luồng sao lưu trình diễn ngoại tuyến.
@@ -35,7 +36,7 @@ dotnet build CloudKeeperSN.sln --configuration Release --no-restore
 dotnet test CloudKeeperSN.sln --configuration Release --no-build
 ```
 
-Unit test không mở WPF và không cần tài khoản đám mây.
+Unit test không mở WPF và không cần tài khoản đám mây. Xem [Drive inventory](docs/drive-inventory.md) để biết phạm vi và checklist kiểm tra thủ công.
 
 ## Chạy với Google Drive thật
 
@@ -76,4 +77,4 @@ Giao diện luôn hiện nhãn **Chế độ trình diễn** khi provider giả 
 
 Ngắt kết nối cố gắng revoke token và luôn xóa token cache cục bộ; không thay đổi tệp đám mây.
 
-Tài liệu: [kiến trúc](docs/architecture.md), [provider Google chỉ đọc](docs/google-drive-readonly.md), [hành vi sao lưu](docs/backup-behavior.md), [bất biến an toàn](docs/safety-invariants.md), [kiểm thử](docs/testing.md), [UI/accessibility checklist](docs/ui-readiness-checklist.md).
+Tài liệu: [kiến trúc](docs/architecture.md), [Drive inventory](docs/drive-inventory.md), [provider Google chỉ đọc](docs/google-drive-readonly.md), [hành vi sao lưu](docs/backup-behavior.md), [bất biến an toàn](docs/safety-invariants.md), [kiểm thử](docs/testing.md), [UI/accessibility checklist](docs/ui-readiness-checklist.md).
