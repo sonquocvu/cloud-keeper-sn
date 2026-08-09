@@ -5,11 +5,15 @@
              xmlns:controls="clr-namespace:CloudKeeperSN.App.Controls">
     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
         <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="56"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource AccentSoft}" HorizontalAlignment="Left">
-                    <TextBlock Text="\uE753" FontFamily="Segoe Fluent Icons" FontSize="20" Foreground="{DynamicResource AccentPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Viewbox Width="24" Height="24" Margin="10" Stretch="Uniform"
+                             automation:AutomationProperties.Name="Biểu tượng dịch vụ đám mây">
+                        <Path Data="M6,19 C2.7,19 1,17.1 1,14.6 C1,12.3 2.6,10.5 4.8,10.1 C5.4,6.5 8.3,4 12,4 C15.8,4 18.9,6.8 19.3,10.5 C21.5,11 23,12.7 23,14.9 C23,17.4 21.1,19 18.3,19 Z"
+                              Fill="{DynamicResource AccentPrimary}"/>
+                    </Viewbox>
                 </Border>
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="{Binding ProviderName}" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
@@ -29,11 +33,20 @@
                             ToolTip="{Binding DisabledExplanation}" ToolTipService.ShowOnDisabled="True"
                             automation:AutomationProperties.Name="Kết nối tài khoản" automation:AutomationProperties.HelpText="{Binding DisabledExplanation}"/>
                     <Button Content="_Hủy đăng nhập" Command="{Binding CancelConnectCommand}" Margin="8,0,0,0"
-                            Visibility="{Binding CanCancelConnection, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <Button Content="_Ngắt kết nối" Command="{Binding DisconnectCommand}" Style="{StaticResource DangerButton}" Margin="20,0,0,0" automation:AutomationProperties.HelpText="Chỉ xóa thông tin kết nối cục bộ; không thay đổi dữ liệu đám mây"/>
+                            Visibility="{Binding CanCancelConnection, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            automation:AutomationProperties.Name="Hủy đăng nhập Google"/>
+                    <Button Content="_Ngắt kết nối" Command="{Binding DisconnectCommand}" Style="{StaticResource DangerButton}" Margin="20,0,0,0"
+                            automation:AutomationProperties.Name="Ngắt kết nối tài khoản"
+                            automation:AutomationProperties.HelpText="Chỉ xóa thông tin kết nối cục bộ; không thay đổi dữ liệu đám mây"/>
                 </StackPanel>
             </Grid>
-            <Border Grid.Row="2" Margin="56,14,0,0" Padding="12" CornerRadius="7" Background="{DynamicResource ErrorSoft}"
+            <Border Grid.Row="2" Margin="56,14,0,0" Padding="12" CornerRadius="7"
+                    Background="{DynamicResource InformationSoft}" BorderBrush="{DynamicResource Information}" BorderThickness="1"
+                    Visibility="{Binding ConfigurationStatusMessage, Converter={StaticResource NullToVisibilityConverter}}">
+                <TextBlock Text="{Binding ConfigurationStatusMessage}" Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap"
+                           automation:AutomationProperties.Name="Trạng thái cấu hình OAuth"/>
+            </Border>
+            <Border Grid.Row="3" Margin="56,14,0,0" Padding="12" CornerRadius="7" Background="{DynamicResource ErrorSoft}"
                     Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}">
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource Error}" TextWrapping="Wrap" automation:AutomationProperties.LiveSetting="Assertive"/>
             </Border>

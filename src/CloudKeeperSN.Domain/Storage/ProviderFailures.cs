@@ -5,6 +5,12 @@ public enum ProviderFailureCategory
     AuthenticationRequired,
     AuthorizationCancelled,
     AuthorizationRevoked,
+    OAuthAccessDenied,
+    OAuthStateMismatch,
+    OAuthCallbackUnavailable,
+    OAuthBrowserUnavailable,
+    OAuthInvalidClient,
+    OAuthRedirectMismatch,
     PermissionDenied,
     NetworkUnavailable,
     RequestTimedOut,
@@ -39,6 +45,18 @@ public static class ProviderFailureMessages
             "Phiên Google Drive không còn hợp lệ. Dữ liệu nguồn vẫn an toàn và chưa bị thay đổi. Vui lòng đăng nhập lại.",
         ProviderFailureCategory.AuthorizationCancelled =>
             "Bạn đã hủy đăng nhập. Không có dữ liệu Google Drive nào bị thay đổi; bạn có thể thử kết nối lại khi sẵn sàng.",
+        ProviderFailureCategory.OAuthAccessDenied =>
+            "Google đã từ chối yêu cầu đăng nhập. Nếu ứng dụng đang ở chế độ Testing, hãy thêm tài khoản này vào Test users; nếu bạn vừa từ chối quyền, hãy thử kết nối lại.",
+        ProviderFailureCategory.OAuthStateMismatch =>
+            "Phản hồi đăng nhập không khớp với yêu cầu đã gửi. Kết nối đã bị hủy để bảo vệ tài khoản; vui lòng thử lại.",
+        ProviderFailureCategory.OAuthCallbackUnavailable =>
+            "Không thể mở cổng callback cục bộ cho đăng nhập Google. Hãy kiểm tra tường lửa hoặc phần mềm bảo mật rồi thử lại.",
+        ProviderFailureCategory.OAuthBrowserUnavailable =>
+            "Không thể mở trình duyệt hệ thống. Hãy đặt trình duyệt mặc định rồi thử kết nối lại.",
+        ProviderFailureCategory.OAuthInvalidClient =>
+            "Google từ chối OAuth client. Hãy kiểm tra Client ID/secret của ứng dụng Desktop và trạng thái OAuth consent screen.",
+        ProviderFailureCategory.OAuthRedirectMismatch =>
+            "Google từ chối địa chỉ callback loopback. Hãy xác nhận OAuth client có loại Desktop application rồi thử lại.",
         ProviderFailureCategory.PermissionDenied =>
             "CloudKeeperSN không có quyền đọc mục này. Dữ liệu Google Drive vẫn an toàn. Vui lòng chọn mục khác hoặc kiểm tra quyền truy cập.",
         ProviderFailureCategory.NetworkUnavailable =>

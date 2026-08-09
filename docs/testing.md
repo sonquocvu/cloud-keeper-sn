@@ -13,9 +13,11 @@ Các test mặc định hoàn toàn ngoại tuyến, không mở GUI và không 
 ## Coverage trọng yếu
 
 - **Domain:** đường dẫn/identity, tên conflict xác định, native export policy, checksum, retry, state machine, redaction và cycle guard.
-- **Application/provider:** OAuth states, thiếu cấu hình, chống sign-in đồng thời, hủy/revoke, capability chỉ đọc, pagination nhiều trang/trang rỗng/token lặp, query escaping, duplicate ID, scan đệ quy, shortcut, native/unsupported/unknown-size, progress/cancellation và retry transient/non-transient.
+- **Application/provider:** parse/validate Desktop OAuth JSON, giới hạn kích thước, loại credential sai, endpoint/redirect, protected configuration restore, precedence, OAuth states, chống sign-in đồng thời, hủy/revoke, capability chỉ đọc, pagination nhiều trang/trang rỗng/token lặp, query escaping, duplicate ID, scan đệ quy, shortcut, native/unsupported/unknown-size, progress/cancellation và retry transient/non-transient.
 - **Infrastructure:** migration SQLite, email metadata, recovery, redaction, protected credential round-trip, plaintext không xuất hiện trên disk và lỗi giải mã an toàn.
-- **App:** navigation, accessibility-facing states, folder picker loading/error/cancel, demo workflow và production metadata preview; partial scan không được publish; transfer thật luôn bị vô hiệu hóa.
+- **App:** navigation, accessibility-facing states, Settings OAuth picker/import/replace/remove/help với fake picker/dialog/protected manager, cập nhật Connect ngay trong phiên, folder picker loading/error/cancel, demo workflow và production metadata preview; partial scan không được publish; transfer thật luôn bị vô hiệu hóa.
+
+Các test import dùng file reader, clock, protected store, authentication và dialog giả; không gọi Windows DPAPI, browser, Google hoặc file picker tương tác. Infrastructure tests riêng xác nhận protected blob không chứa plaintext trên disk và lỗi giải mã được xử lý an toàn.
 
 ## Live integration tests
 

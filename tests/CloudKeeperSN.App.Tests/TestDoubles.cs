@@ -34,8 +34,10 @@ internal sealed class FakeDialogService : IDialogService
 {
     public bool ConfirmationResult { get; set; } = true;
     public List<ConfirmationRequest> Requests { get; } = [];
+    public List<(string Title, string Message)> InformationRequests { get; } = [];
     public Task<bool> ConfirmAsync(ConfirmationRequest request, CancellationToken cancellationToken) { cancellationToken.ThrowIfCancellationRequested(); Requests.Add(request); return Task.FromResult(ConfirmationResult); }
     public Task ShowErrorAsync(string title, string message, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task ShowInformationAsync(string title, string message, CancellationToken cancellationToken) { InformationRequests.Add((title, message)); return Task.CompletedTask; }
 }
 
 internal sealed class FakeFolderPickerService : IFolderPickerService
@@ -85,4 +87,3 @@ internal static class AsyncTest
         }
     }
 }
-

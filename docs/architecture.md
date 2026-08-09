@@ -41,7 +41,7 @@ Migration 1 creates tables for accounts (metadata only), backup definitions, run
 
 ## Authentication boundary
 
-`GoogleAuthenticationService` uses system-browser installed-app OAuth with PKCE and a loopback receiver. `ProtectedGoogleDataStore` encrypts token blobs using Windows DPAPI CurrentUser outside SQLite. Account rows contain metadata only. Password forms are prohibited.
+`GoogleAuthenticationService` uses system-browser installed-app OAuth with PKCE and a random-port `127.0.0.1` loopback receiver. A wrapper adds and validates an unpredictable OAuth state value, and interactive authorization has a bounded timeout. `GoogleOAuthConfigurationManager` accepts only Google's dedicated Desktop `installed` JSON shape, validates Google HTTPS endpoints/loopback redirects, and persists only client ID/secret through the DPAPI CurrentUser protected credential store. Imported Settings configuration has precedence over a complete environment-variable development pair; values are never combined across sources. Change notifications refresh the OAuth client, Accounts command state and Settings metadata in the same process. `ProtectedGoogleDataStore` separately protects user authorization tokens outside SQLite. Account rows contain metadata only. Password forms are prohibited.
 
 ## Package decisions
 

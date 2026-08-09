@@ -95,11 +95,13 @@ public sealed class GoogleDriveBrowsingTests
 
     private sealed class SessionOAuthClient(IGoogleDriveSession session) : IGoogleOAuthClient
     {
+        public event Action? ConfigurationChanged { add { } remove { } }
         public bool IsConfigured => true;
         public string? ConfigurationMessage => null;
         public Task<IGoogleDriveSession?> RestoreAsync(CancellationToken cancellationToken) => Task.FromResult<IGoogleDriveSession?>(session);
         public Task<IGoogleDriveSession> AuthorizeAsync(CancellationToken cancellationToken) => Task.FromResult(session);
         public Task DisconnectAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task ClearLocalAuthorizationAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class MemoryAccounts : IStorageAccountRepository

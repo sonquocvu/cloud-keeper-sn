@@ -44,7 +44,11 @@ public partial class App : System.Windows.Application
         }
         else
         {
-            services.AddSingleton(GoogleOAuthConfiguration.FromEnvironment());
+            services.AddSingleton<IGoogleOAuthEnvironment, SystemGoogleOAuthEnvironment>();
+            services.AddSingleton<IGoogleOAuthImportFileReader, GoogleOAuthImportFileReader>();
+            services.AddSingleton<IGoogleOAuthClock, SystemGoogleOAuthClock>();
+            services.AddSingleton<GoogleOAuthConfigurationManager>();
+            services.AddSingleton<IGoogleOAuthConfigurationManager>(provider => provider.GetRequiredService<GoogleOAuthConfigurationManager>());
             services.AddSingleton<IGoogleOAuthClient, GoogleApisOAuthClient>();
             services.AddSingleton<GoogleAuthenticationService>();
             services.AddSingleton<IProviderAuthenticationService>(provider => provider.GetRequiredService<GoogleAuthenticationService>());
@@ -56,6 +60,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IDemoDelay, DemoDelay>();
         services.AddSingleton<DemoTransferEngine>();
         services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<IGoogleOAuthFilePickerService, GoogleOAuthFilePickerService>();
         services.AddSingleton<IFolderPickerService, FolderPickerService>();
         services.AddSingleton<IDiagnosticExportService, DiagnosticExportService>();
         services.AddSingleton<ILocalDataService, LocalDataService>();
@@ -69,7 +74,16 @@ public partial class App : System.Windows.Application
             demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IProviderAuthenticationService>()));
         services.AddSingleton<BackupViewModel>();
         services.AddSingleton<HistoryViewModel>();
-        services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton(provider => new SettingsViewModel(
+            provider.GetRequiredService<IThemeService>(),
+            provider.GetRequiredService<IApplicationSettingRepository>(),
+            provider.GetRequiredService<ILocalDataService>(),
+            provider.GetRequiredService<IDiagnosticExportService>(),
+            provider.GetRequiredService<DemoWorkspace>(),
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IGoogleOAuthConfigurationManager>(),
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IProviderAuthenticationService>(),
+            provider.GetRequiredService<IGoogleOAuthFilePickerService>(),
+            provider.GetRequiredService<IDialogService>()));
         services.AddSingleton(provider => new MainWindowViewModel(
             provider.GetRequiredService<DashboardViewModel>(),
             provider.GetRequiredService<AccountsViewModel>(),
@@ -85,6 +99,11 @@ public partial class App : System.Windows.Application
         try
         {
             await _serviceProvider.GetRequiredService<IApplicationDatabase>().InitializeAsync(CancellationToken.None);
+            if (!demoConfiguration.IsEnabled)
+            {
+                await _serviceProvider.GetRequiredService<IGoogleOAuthConfigurationManager>()
+                    .InitializeAsync(CancellationToken.None);
+            }
             await _serviceProvider.GetRequiredService<TransferRecoveryService>().RecoverAsync(CancellationToken.None);
             await _serviceProvider.GetRequiredService<IThemeService>().InitializeAsync(CancellationToken.None);
             await _serviceProvider.GetRequiredService<DemoDataService>().InitializeAsync(CancellationToken.None);

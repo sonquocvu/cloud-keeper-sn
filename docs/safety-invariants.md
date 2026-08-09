@@ -16,5 +16,8 @@ These rules are mandatory and take priority over convenience:
 12. Every future copy, skip, rename, export, warning, and failure decision must produce an activity event.
 13. Tokens, secrets, authorization headers/codes, and sensitive query values must be redacted before persistence or export.
 14. SQLite stores metadata and state, never full document content or image thumbnails.
+15. Imported OAuth client configuration is accepted only from a validated Google Desktop `installed` JSON object and is DPAPI CurrentUser protected outside SQLite.
+16. Replacing or removing OAuth configuration clears only local authorization for the previous client; it does not revoke access remotely or change Drive data automatically.
+17. OAuth client secrets, original JSON, source paths and unmasked client IDs are never exposed through Settings view-model display state, logs or diagnostic exports.
 
 The production Google provider exposes authentication/browse/metadata/export-planning capabilities only. It has no content-read, export execution, folder-create or write capability. DPAPI credential storage, migration constraints, redaction, pagination guards, complete-scan-only persistence and tests enforce these rules. A later destination/transfer pipeline must preserve them.

@@ -79,9 +79,11 @@ public interface IProviderAuthenticationService
     string? ConfigurationMessage { get; }
     ProviderAuthenticationState State { get; }
     event Action<ProviderAuthenticationState>? StateChanged;
+    event Action? ConfigurationChanged;
     Task<StorageAccount?> GetCachedAccountAsync(CancellationToken cancellationToken);
     Task<StorageAccount> ConnectAsync(CancellationToken cancellationToken);
     Task DisconnectAsync(CancellationToken cancellationToken);
+    Task DisconnectLocalAsync(CancellationToken cancellationToken);
 }
 
 public enum ProviderAuthenticationStatus

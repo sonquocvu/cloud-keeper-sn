@@ -61,6 +61,7 @@ appsettings.Development.json
 appsettings.Local.json
 secrets.json
 oauth.local.json
+google-oauth.local.json
 client_secret*.json
 token-cache/
 

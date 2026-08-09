@@ -20,6 +20,11 @@ public sealed class GoogleAuthenticationService(
     public string? ConfigurationMessage => oauthClient.ConfigurationMessage;
     public ProviderAuthenticationState State { get; private set; } = new(ProviderAuthenticationStatus.Disconnected, "Chưa kết nối");
     public event Action<ProviderAuthenticationState>? StateChanged;
+    public event Action? ConfigurationChanged
+    {
+        add => oauthClient.ConfigurationChanged += value;
+        remove => oauthClient.ConfigurationChanged -= value;
+    }
     public StorageAccount? CurrentAccount => _account;
 
     public async Task<StorageAccount?> GetCachedAccountAsync(CancellationToken cancellationToken)
@@ -69,6 +74,7 @@ public sealed class GoogleAuthenticationService(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            await SafeClearAsync(CancellationToken.None);
             SetState(ProviderAuthenticationStatus.Cancelled, "Đã hủy đăng nhập");
             await diagnostics.WriteAsync("GoogleAuthenticationCancelled", "Đã hủy đăng nhập Google Drive.", null, CancellationToken.None);
             throw;
@@ -76,6 +82,7 @@ public sealed class GoogleAuthenticationService(
         catch (Exception exception)
         {
             var failure = GoogleProviderExceptionMapper.Map(exception);
+            await SafeClearAsync(CancellationToken.None);
             var status = failure.Category is ProviderFailureCategory.AuthorizationCancelled
                 ? ProviderAuthenticationStatus.Cancelled
                 : failure.Category is ProviderFailureCategory.AuthorizationRevoked or ProviderFailureCategory.AuthenticationRequired
@@ -105,6 +112,27 @@ public sealed class GoogleAuthenticationService(
             await accounts.RemoveAsync(AccountRecordId, CancellationToken.None);
             SetState(ProviderAuthenticationStatus.Disconnected, "Chưa kết nối");
             await diagnostics.WriteAsync("GoogleAccountDisconnected", "Đã xóa thông tin đăng nhập Google Drive lưu cục bộ; dữ liệu đám mây không bị thay đổi.", null, CancellationToken.None);
+        }
+    }
+
+    public async Task DisconnectLocalAsync(CancellationToken cancellationToken)
+    {
+        SetState(ProviderAuthenticationStatus.Disconnecting, "Đang ngắt kết nối cục bộ");
+        try
+        {
+            await oauthClient.ClearLocalAuthorizationAsync(cancellationToken);
+        }
+        finally
+        {
+            _session = null;
+            _account = null;
+            await accounts.RemoveAsync(AccountRecordId, CancellationToken.None);
+            SetState(ProviderAuthenticationStatus.Disconnected, "Chưa kết nối");
+            await diagnostics.WriteAsync(
+                "GoogleAccountDisconnectedLocally",
+                "Đã xóa authorization cache Google Drive cục bộ để thay đổi cấu hình OAuth; quyền trên Google và dữ liệu đám mây không bị thay đổi.",
+                null,
+                CancellationToken.None);
         }
     }
 

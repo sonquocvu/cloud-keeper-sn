@@ -31,7 +31,9 @@ public interface IGoogleOAuthClient
 {
     bool IsConfigured { get; }
     string? ConfigurationMessage { get; }
+    event Action? ConfigurationChanged;
     Task<IGoogleDriveSession?> RestoreAsync(CancellationToken cancellationToken);
     Task<IGoogleDriveSession> AuthorizeAsync(CancellationToken cancellationToken);
     Task DisconnectAsync(CancellationToken cancellationToken);
+    Task ClearLocalAuthorizationAsync(CancellationToken cancellationToken);
 }

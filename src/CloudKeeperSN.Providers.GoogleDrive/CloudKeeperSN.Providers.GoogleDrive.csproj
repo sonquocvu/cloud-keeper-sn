@@ -7,4 +7,7 @@
     <PackageReference Include="Google.Apis.Auth" />
     <PackageReference Include="Google.Apis.Drive.v3" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CloudKeeperSN.Application.Tests" />
+  </ItemGroup>
 </Project>

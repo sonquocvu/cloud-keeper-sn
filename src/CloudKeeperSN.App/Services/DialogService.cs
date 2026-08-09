@@ -14,6 +14,7 @@ public interface IDialogService
 {
     Task<bool> ConfirmAsync(ConfirmationRequest request, CancellationToken cancellationToken);
     Task ShowErrorAsync(string title, string message, CancellationToken cancellationToken);
+    Task ShowInformationAsync(string title, string message, CancellationToken cancellationToken);
 }
 
 public sealed class DialogService : IDialogService
@@ -29,6 +30,9 @@ public sealed class DialogService : IDialogService
     }
 
     public Task ShowErrorAsync(string title, string message, CancellationToken cancellationToken)
+        => ShowInformationAsync(title, message, cancellationToken);
+
+    public Task ShowInformationAsync(string title, string message, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var request = new ConfirmationRequest(title, message, "Đã hiểu", string.Empty);
@@ -40,4 +44,3 @@ public sealed class DialogService : IDialogService
         return Task.CompletedTask;
     }
 }
-

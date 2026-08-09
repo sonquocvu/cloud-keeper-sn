@@ -40,6 +40,74 @@
                 </StackPanel>
             </Border>
 
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16"
+                    Visibility="{Binding IsGoogleOAuthAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="Kết nối dịch vụ" Style="{StaticResource SectionTitleText}"
+                               automation:AutomationProperties.HeadingLevel="Level2"/>
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Kết nối Google Drive" Style="{StaticResource CardTitleText}"
+                                       automation:AutomationProperties.HeadingLevel="Level3"/>
+                            <TextBlock Text="Nhập file OAuth dành cho ứng dụng máy tính được tải xuống từ Google Cloud Console."
+                                       Style="{StaticResource SupportingText}" Margin="0,4,18,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <controls:StatusBadge Grid.Column="1" Text="{Binding GoogleOAuthStatus.Text}" Tone="{Binding GoogleOAuthStatus.Tone}"
+                                              automation:AutomationProperties.LiveSetting="Polite"/>
+                    </Grid>
+
+                    <Border Margin="0,14,0,0" Padding="12" CornerRadius="7" Background="{DynamicResource BackgroundSecondary}">
+                        <StackPanel>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                <TextBlock Text="Loại ứng dụng" Style="{StaticResource CardTitleText}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding GoogleOAuthApplicationType}" Style="{StaticResource SupportingText}"/>
+                            </Grid>
+                            <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                <TextBlock Text="Nguồn cấu hình" Style="{StaticResource CardTitleText}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding GoogleOAuthSource}" Style="{StaticResource SupportingText}"/>
+                            </Grid>
+                            <Grid Margin="0,8,0,0" Visibility="{Binding HasGoogleOAuthMetadata, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                <TextBlock Text="Client ID" Style="{StaticResource CardTitleText}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding GoogleOAuthMaskedClientId}" Style="{StaticResource SupportingText}"
+                                           automation:AutomationProperties.Name="Client ID Google OAuth đã che"/>
+                            </Grid>
+                            <Grid Margin="0,8,0,0" Visibility="{Binding HasGoogleOAuthMetadata, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                <TextBlock Text="Thời điểm nhập" Style="{StaticResource CardTitleText}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding GoogleOAuthImportedAt}" Style="{StaticResource SupportingText}"/>
+                            </Grid>
+                            <TextBlock Text="{Binding GoogleOAuthValidationMessage}" Style="{StaticResource CaptionText}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <controls:InlineNotification Title="Google Drive luôn là nguồn chỉ đọc"
+                                                 Message="CloudKeeperSN chỉ yêu cầu quyền đọc Google Drive và không thể sửa hoặc xóa dữ liệu nguồn. Nhập file OAuth chỉ cấu hình ứng dụng; bạn vẫn đăng nhập an toàn trong trình duyệt hệ thống."
+                                                 Margin="0,14,0,0"/>
+
+                    <TextBlock Text="{Binding GoogleOAuthErrorMessage}" Foreground="{DynamicResource Error}" Margin="0,12,0,0"
+                               TextWrapping="Wrap" Visibility="{Binding GoogleOAuthErrorMessage, Converter={StaticResource NullToVisibilityConverter}}"
+                               automation:AutomationProperties.LiveSetting="Assertive"/>
+                    <TextBlock Text="{Binding GoogleOAuthActionMessage}" Foreground="{DynamicResource Success}" Margin="0,12,0,0"
+                               TextWrapping="Wrap" Visibility="{Binding GoogleOAuthActionMessage, Converter={StaticResource NullToVisibilityConverter}}"
+                               automation:AutomationProperties.LiveSetting="Polite"/>
+
+                    <WrapPanel HorizontalAlignment="Right" Margin="0,16,0,0">
+                        <Button Content="Hướng dẫn lấy file OAuth" Command="{Binding ShowGoogleOAuthGuideCommand}" Margin="0,0,8,0"
+                                ToolTip="Xem các bước tải OAuth JSON loại Desktop app"
+                                automation:AutomationProperties.Name="Hướng dẫn lấy file OAuth Google"/>
+                        <Button Content="Xóa cấu hình" Command="{Binding RemoveGoogleOAuthCommand}" Style="{StaticResource DangerButton}" Margin="0,0,8,0"
+                                Visibility="{Binding CanRemoveGoogleOAuth, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                ToolTip="Xóa cấu hình và authorization cache cục bộ; không thay đổi dữ liệu Google Drive"
+                                automation:AutomationProperties.Name="Xóa cấu hình Google OAuth"/>
+                        <Button Content="{Binding GoogleOAuthPrimaryActionText}" Command="{Binding ImportGoogleOAuthCommand}" Style="{StaticResource PrimaryButton}"
+                                ToolTip="Chọn file JSON OAuth Desktop được tải từ Google Cloud Console"
+                                automation:AutomationProperties.Name="Chọn file OAuth JSON của Google"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock Text="Truyền dữ liệu" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>

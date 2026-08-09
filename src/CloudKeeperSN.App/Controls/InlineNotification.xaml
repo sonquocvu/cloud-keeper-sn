@@ -3,7 +3,11 @@
              xmlns:presentation="clr-namespace:CloudKeeperSN.App.Presentation">
     <Border x:Name="Panel" Padding="14" CornerRadius="8" BorderThickness="1">
         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <TextBlock x:Name="Icon" Text="\uE946" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource Information}" FontSize="15" />
+            <Grid Width="16" Height="16" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False">
+                <Ellipse Stroke="{DynamicResource Information}" StrokeThickness="1.6"/>
+                <Ellipse Width="2" Height="2" Fill="{DynamicResource Information}" VerticalAlignment="Top" Margin="0,3.2,0,0"/>
+                <Rectangle Width="1.8" Height="6" RadiusX="0.9" RadiusY="0.9" Fill="{DynamicResource Information}" VerticalAlignment="Bottom" Margin="0,0,0,2.5"/>
+            </Grid>
             <StackPanel Grid.Column="1"><TextBlock Text="{Binding Title, ElementName=Root}" FontWeight="SemiBold"/><TextBlock Text="{Binding Message, ElementName=Root}" Style="{StaticResource SupportingText}" Margin="0,3,0,0"/></StackPanel>
         </Grid>
         <Border.Style>

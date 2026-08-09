@@ -30,6 +30,9 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
     private string? _accountName;
     private string? _email;
     private string? _errorMessage;
+    private bool _isProviderEnabled;
+    private string? _disabledExplanation;
+    private string? _configurationStatusMessage;
 
     public ProviderAccountCardViewModel(
         string providerId,
@@ -48,14 +51,19 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
         ProviderName = providerName;
         Description = description;
         ConnectText = connectText;
-        IsProviderEnabled = isEnabled;
-        DisabledExplanation = disabledExplanation;
+        _isProviderEnabled = isEnabled;
+        _disabledExplanation = isEnabled ? null : disabledExplanation;
+        _configurationStatusMessage = isEnabled ? disabledExplanation : null;
         _dialogs = dialogs;
         _load = load;
         _connect = connect;
         _disconnect = disconnect;
         _authentication = authentication;
-        if (_authentication is not null) _authentication.StateChanged += AuthenticationStateChanged;
+        if (_authentication is not null)
+        {
+            _authentication.StateChanged += AuthenticationStateChanged;
+            _authentication.ConfigurationChanged += AuthenticationConfigurationChanged;
+        }
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, CanConnect);
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => IsProviderEnabled && State == AccountConnectionState.Connected);
         CancelConnectCommand = new RelayCommand(_ => ((AsyncRelayCommand)ConnectCommand).Cancel(), _ => CanCancelConnection);
@@ -65,8 +73,9 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
     public string ProviderName { get; }
     public string Description { get; }
     public string ConnectText { get; }
-    public bool IsProviderEnabled { get; }
-    public string? DisabledExplanation { get; }
+    public bool IsProviderEnabled { get => _isProviderEnabled; private set => SetProperty(ref _isProviderEnabled, value); }
+    public string? DisabledExplanation { get => _disabledExplanation; private set => SetProperty(ref _disabledExplanation, value); }
+    public string? ConfigurationStatusMessage { get => _configurationStatusMessage; private set => SetProperty(ref _configurationStatusMessage, value); }
     public ICommand ConnectCommand { get; }
     public ICommand DisconnectCommand { get; }
     public ICommand CancelConnectCommand { get; }
@@ -187,6 +196,32 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
         };
         if (state.Status is ProviderAuthenticationStatus.Failed or ProviderAuthenticationStatus.ReauthenticationRequired or ProviderAuthenticationStatus.Cancelled)
             ErrorMessage = state.VietnameseMessage;
+        if (state.Status == ProviderAuthenticationStatus.Disconnected)
+        {
+            AccountName = null;
+            Email = null;
+        }
+    }
+
+    private void AuthenticationConfigurationChanged()
+    {
+        if (_authentication is null) return;
+        IsProviderEnabled = _authentication.IsConfigured;
+        DisabledExplanation = IsProviderEnabled ? null : _authentication.ConfigurationMessage;
+        ConfigurationStatusMessage = IsProviderEnabled ? _authentication.ConfigurationMessage : null;
+        if (!IsProviderEnabled)
+        {
+            AccountName = null;
+            Email = null;
+            State = AccountConnectionState.Disconnected;
+            ErrorMessage = DisabledExplanation;
+        }
+        else if (!IsConnected)
+        {
+            State = AccountConnectionState.Disconnected;
+            ErrorMessage = null;
+        }
+        NotifyCommands();
     }
 
     private void NotifyCommands()
@@ -198,7 +233,11 @@ public sealed class ProviderAccountCardViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        if (_authentication is not null) _authentication.StateChanged -= AuthenticationStateChanged;
+        if (_authentication is not null)
+        {
+            _authentication.StateChanged -= AuthenticationStateChanged;
+            _authentication.ConfigurationChanged -= AuthenticationConfigurationChanged;
+        }
         ((AsyncRelayCommand)ConnectCommand).Dispose();
         ((AsyncRelayCommand)DisconnectCommand).Dispose();
     }

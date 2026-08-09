@@ -10,6 +10,7 @@ Trong chế độ thực chưa có đích lưu trữ và chưa có truyền dữ
 ## Chức năng hiện có
 
 - OAuth 2.0 installed-app với PKCE, trình duyệt hệ thống và loopback receiver trên cổng trống;
+- nhập trực tiếp file OAuth JSON loại Desktop app tại **Cài đặt > Kết nối dịch vụ**, không cần tự chép Client ID/secret;
 - đúng một scope Google: `https://www.googleapis.com/auth/drive.readonly`;
 - token được DPAPI bảo vệ theo Windows CurrentUser; SQLite chỉ lưu metadata tài khoản;
 - trạng thái kết nối/hủy/lỗi/đăng nhập lại và ngắt kết nối có xác nhận;
@@ -38,16 +39,21 @@ Unit test không mở WPF và không cần tài khoản đám mây.
 
 ## Chạy với Google Drive thật
 
-Tạo OAuth client loại **Desktop app**, bật Google Drive API, rồi đặt biến môi trường trong phiên PowerShell. Không commit giá trị thật:
+1. Trong Google Cloud Console, bật Google Drive API, cấu hình consent screen và tạo OAuth Client ID loại **Desktop app**.
+2. Tải file JSON của OAuth client; không mở hoặc sao chép Client Secret vào CloudKeeperSN bằng tay.
+3. Chạy ứng dụng ở chế độ thực:
 
 ```powershell
 $env:CLOUDKEEPERSN_DEMO_MODE='false'
-$env:CLOUDKEEPERSN_GOOGLE_CLIENT_ID='...apps.googleusercontent.com'
-$env:CLOUDKEEPERSN_GOOGLE_CLIENT_SECRET='...'
 dotnet run --project src/CloudKeeperSN.App/CloudKeeperSN.App.csproj --configuration Release
 ```
 
-Xem quy trình đầy đủ và yêu cầu Google verification trong [OAuth setup](docs/oauth-setup.md). Ứng dụng không đọc file `.env` tự động; [.env.example](.env.example) chỉ liệt kê tên biến.
+4. Mở **Cài đặt > Kết nối dịch vụ > Kết nối Google Drive**, chọn **Chọn file OAuth JSON** và chọn file vừa tải.
+5. Khi trạng thái thành **Đã cấu hình**, mở **Tài khoản** và chọn **Kết nối Google Drive**.
+
+File nguồn không bị sửa/xóa và không cần tồn tại sau khi nhập. Cấu hình được DPAPI CurrentUser bảo vệ; việc nhập cấu hình chưa đăng nhập tài khoản, nên authorization vẫn diễn ra trong trình duyệt hệ thống. Khi consent screen ở trạng thái Testing, phải thêm tài khoản đăng nhập vào Test users. Xem chi tiết trong [OAuth setup](docs/oauth-setup.md).
+
+Hai biến `CLOUDKEEPERSN_GOOGLE_CLIENT_ID` và `CLOUDKEEPERSN_GOOGLE_CLIENT_SECRET` vẫn được hỗ trợ như một cặp fallback dành cho phát triển/chẩn đoán. Cấu hình được nhập từ Settings luôn có ưu tiên cao hơn; các trường từ nhiều nguồn không được trộn.
 
 ## Chế độ trình diễn
 
@@ -64,6 +70,7 @@ Giao diện luôn hiện nhãn **Chế độ trình diễn** khi provider giả 
 ## Dữ liệu cục bộ
 
 - SQLite: `%LOCALAPPDATA%\CloudKeeperSN\cloudkeeper.db`
+- cấu hình OAuth đã nhập và mã hóa: `%LOCALAPPDATA%\CloudKeeperSN\Credentials\google-oauth-config\`
 - token đã mã hóa: `%LOCALAPPDATA%\CloudKeeperSN\Credentials\google-drive\`
 - log/cache: `%LOCALAPPDATA%\CloudKeeperSN\Logs\` và `Cache\`
 
