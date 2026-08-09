@@ -1,31 +1,37 @@
-# OAuth setup (for later checkpoints)
+# Google OAuth setup
 
-Checkpoint 1 does not contain real OAuth implementations. The steps below document the registrations that Checkpoints 2 and 3 will require; do not invent or commit credentials.
+## Google Cloud Console
 
-## Google Drive registration
+1. Tạo/chọn Google Cloud project và bật **Google Drive API**.
+2. Cấu hình OAuth consent screen, tên ứng dụng, email hỗ trợ và đối tượng người dùng phù hợp.
+3. Thêm đúng scope `https://www.googleapis.com/auth/drive.readonly`.
+4. Tạo OAuth client loại **Desktop app**. Không dùng client loại Web.
+5. Sao chép client ID và client secret vào biến môi trường cục bộ; không đưa JSON credentials vào repository.
 
-1. Create a Google Cloud project owned by the user/team.
-2. Enable Google Drive API.
-3. Configure the OAuth consent screen.
-4. Create an OAuth desktop application/client suitable for authorization-code flow with PKCE.
-5. Request only Google Drive read-only access (`drive.readonly`) for the MVP.
-6. Put the client ID and loopback redirect URI in an untracked local configuration derived from `.env.example`.
+```powershell
+$env:CLOUDKEEPERSN_DEMO_MODE='false'
+$env:CLOUDKEEPERSN_GOOGLE_CLIENT_ID='...apps.googleusercontent.com'
+$env:CLOUDKEEPERSN_GOOGLE_CLIENT_SECRET='...'
+```
 
-The application must use the system browser. It must not request or store the Google password. “Shared with me” is excluded unless the selected accessible item explicitly belongs to the chosen source.
+Google installed-app flow mở trình duyệt hệ thống và dùng loopback receiver `127.0.0.1` trên một cổng trống do thư viện chọn. Không cấu hình fixed redirect URI trong ứng dụng. Flow dùng PKCE và không bao giờ yêu cầu mật khẩu Google trong CloudKeeperSN.
 
-## Microsoft identity registration
+Nếu thiếu client ID/secret, nút kết nối bị vô hiệu hóa và UI giải thích cấu hình còn thiếu. Chỉ một lần đăng nhập tương tác được phép chạy tại một thời điểm; người dùng có thể hủy.
 
-1. Register a public/native client application.
-2. Allow personal Microsoft accounts (`consumers`).
-3. Configure the loopback redirect URI used by the desktop client.
-4. Enable authorization-code flow with PKCE; do not use a client secret in the desktop application.
-5. Request the smallest delegated Microsoft Graph scope that supports user-selected OneDrive backup operations. Final scope choice belongs to Checkpoint 3 and must be documented after verification against current Microsoft guidance.
+## Scope và verification
 
-## Token storage and disconnect
+`drive.readonly` là restricted scope. Nó cho phép xem/tải toàn bộ tệp Drive mà người dùng có thể truy cập; CloudKeeperSN hiện chỉ dùng phần metadata/list và chưa gọi download/export. Trước khi phát hành rộng rãi, chủ ứng dụng phải hoàn tất OAuth app verification của Google và có thể phải thực hiện security assessment theo chính sách restricted-scope hiện hành. Trong testing mode, giới hạn test users và thời hạn token của Google vẫn áp dụng.
 
-Future token caches must be encrypted for the current Windows user using DPAPI, kept outside the repository, and excluded from diagnostics. **Ngắt kết nối tài khoản** must revoke or clear the local cache and update account metadata. Revoked/expired sessions must show a concise Vietnamese reconnect message.
+Không thay scope bằng `drive.file`: scope đó chỉ phù hợp với tệp do ứng dụng tạo/mở qua picker và không đáp ứng việc người dùng chọn/quét cây thư mục hiện có cho backup.
 
-## Integration tests
+## Token và ngắt kết nối
 
-Live tests will be optional, separated from unit tests, and skipped unless explicit environment configuration is present. Never use a personal production account for automated destructive tests.
+- Google token JSON được serialize rồi mã hóa bằng Windows DPAPI `CurrentUser`.
+- Mỗi blob nằm ngoài repo tại `%LOCALAPPDATA%\CloudKeeperSN\Credentials\google-drive\`; tên file là hash, không chứa token key rõ.
+- SQLite chỉ lưu provider/account ID, tên hiển thị, email và thời điểm kết nối.
+- Ngắt kết nối yêu cầu xác nhận chính xác tài khoản, cố gắng revoke token, rồi xóa cache cục bộ ngay cả khi revoke từ xa lỗi.
+- Token hết hạn/revoked hoặc DPAPI không giải mã được sẽ chuyển UI sang trạng thái cần đăng nhập lại; không ghi token hay authorization code vào log.
 
+## Không có Microsoft/OneDrive thật
+
+Bản dựng này không đăng ký Microsoft identity, không gọi Microsoft Graph và không thay provider thật bằng fake provider một cách âm thầm. OneDrive chỉ xuất hiện trong chế độ demo. Production dừng ở bản xem trước Google Drive chỉ đọc.

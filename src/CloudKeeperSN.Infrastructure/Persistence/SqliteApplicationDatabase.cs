@@ -134,6 +134,9 @@ public sealed class SqliteApplicationDatabase(SqliteConnectionFactory connection
 
             CREATE INDEX ix_transfer_items_recovery ON transfer_items(state, next_retry_at_utc);
             CREATE INDEX ix_activity_events_time ON activity_events(occurred_at_utc DESC);
+            """),
+        (2, """
+            ALTER TABLE connected_accounts ADD COLUMN email TEXT NULL;
             """)
     ];
 
@@ -186,4 +189,3 @@ public sealed class SqliteApplicationDatabase(SqliteConnectionFactory connection
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }
-

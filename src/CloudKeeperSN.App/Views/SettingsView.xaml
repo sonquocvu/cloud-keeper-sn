@@ -8,7 +8,35 @@
                 <StackPanel>
                     <TextBlock Text="Giao diện" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
                     <TextBlock Text="Thay đổi được áp dụng ngay và được ghi nhớ cho lần mở sau." Style="{StaticResource SupportingText}" Margin="0,4,0,14"/>
-                    <ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme}" DisplayMemberPath="VietnameseLabel" Width="280" HorizontalAlignment="Left" automation:AutomationProperties.Name="Chọn giao diện"/>
+                    <Border Width="280" HorizontalAlignment="Left" Background="#FFFFFFFF" BorderBrush="#FF667085" BorderThickness="1" CornerRadius="7" Padding="1">
+                        <ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme}"
+                                  Foreground="#FF172033" Background="#FFFFFFFF" BorderThickness="0"
+                                  automation:AutomationProperties.Name="Chọn giao diện">
+                            <ComboBox.Resources>
+                                <Style TargetType="ComboBoxItem">
+                                    <Setter Property="Padding" Value="10,7" />
+                                    <Setter Property="Foreground" Value="#FF172033" />
+                                    <Setter Property="Background" Value="#FFFFFFFF" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Style.Triggers>
+                                        <Trigger Property="IsHighlighted" Value="True">
+                                            <Setter Property="Foreground" Value="#FF172033" />
+                                            <Setter Property="Background" Value="#FFE8F1FF" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Foreground" Value="#FF172033" />
+                                            <Setter Property="Background" Value="#FFDCEAFF" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ComboBox.Resources>
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding VietnameseLabel}" Foreground="#FF172033" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </Border>
                 </StackPanel>
             </Border>
 

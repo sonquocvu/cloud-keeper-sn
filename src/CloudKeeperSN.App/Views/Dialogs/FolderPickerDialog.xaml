@@ -8,16 +8,25 @@
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level1"/>
         <Grid Grid.Row="1" Margin="0,16,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <Button Content="\uE72B" FontFamily="Segoe Fluent Icons" Style="{StaticResource IconButton}" Command="{Binding GoUpCommand}" ToolTip="Quay lại thư mục trước"/>
+            <Button Content="\uE72B" FontFamily="Segoe Fluent Icons" Style="{StaticResource IconButton}" Command="{Binding GoUpCommand}" ToolTip="Quay lại thư mục trước"
+                    automation:AutomationProperties.Name="Quay lại thư mục trước" ToolTipService.ShowOnDisabled="True"/>
             <Border Grid.Column="1" Background="{DynamicResource SurfacePrimary}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="7" Padding="12,8" Margin="8,0,0,0"><TextBlock Text="{Binding CurrentPath}" TextTrimming="CharacterEllipsis"/></Border>
         </Grid>
         <Border Grid.Row="2" Style="{StaticResource Card}" Padding="10">
             <Grid>
                 <ListBox ItemsSource="{Binding Folders}" SelectedItem="{Binding SelectedEntry}" automation:AutomationProperties.Name="Các thư mục con">
-                    <ListBox.ItemTemplate><DataTemplate><Button Command="{Binding DataContext.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" HorizontalContentAlignment="Stretch" BorderThickness="0" Background="Transparent"><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding IconGlyph}" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource AccentPrimary}" Margin="0,0,10,0"/><TextBlock Text="{Binding Name}"/></StackPanel></Button></DataTemplate></ListBox.ItemTemplate>
+                    <ListBox.ItemTemplate><DataTemplate><Button Command="{Binding DataContext.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" HorizontalContentAlignment="Stretch" BorderThickness="0" Background="Transparent" automation:AutomationProperties.Name="{Binding Name}"><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding IconGlyph}" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource AccentPrimary}" Margin="0,0,10,0"/><TextBlock Text="{Binding Name}"/></StackPanel></Button></DataTemplate></ListBox.ItemTemplate>
                 </ListBox>
-                <controls:LoadingIndicator Message="Đang tải thư mục…" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <controls:LoadingIndicator Message="Đang tải thư mục…" automation:AutomationProperties.LiveSetting="Polite"/>
+                    <Button Content="_Hủy tải" Command="{Binding CancelLoadingCommand}" Margin="0,12,0,0" HorizontalAlignment="Center"
+                            automation:AutomationProperties.HelpText="Dừng yêu cầu đang tải; không thay đổi dữ liệu Google Drive."/>
+                </StackPanel>
                 <controls:EmptyState Title="Thư mục này đang trống" Message="Bạn vẫn có thể chọn thư mục hiện tại." IconGlyph="\uE8B7" Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="430" Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}">
+                    <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource Error}" TextWrapping="Wrap" TextAlignment="Center" automation:AutomationProperties.LiveSetting="Assertive"/>
+                    <Button Content="_Thử lại" Command="{Binding RetryCommand}" Margin="0,12,0,0" HorizontalAlignment="Center"/>
+                </StackPanel>
             </Grid>
         </Border>
         <Grid Grid.Row="3" Margin="0,12,0,0" Visibility="{Binding CanCreateFolder, Converter={StaticResource BooleanToVisibilityConverter}}"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -26,9 +35,8 @@
         </Grid>
         <Grid Grid.Row="4" Margin="0,18,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <TextBlock Text="Chỉ hiển thị thư mục" Style="{StaticResource CaptionText}" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Content="Hủy" Click="CancelClick" IsCancel="True" Margin="0,0,8,0"/>
-            <Button Grid.Column="2" Content="Chọn thư mục này" Click="SelectClick" IsDefault="True" Style="{StaticResource PrimaryButton}"/>
+            <Button Grid.Column="1" Content="_Hủy" Click="CancelClick" IsCancel="True" Margin="0,0,8,0"/>
+            <Button Grid.Column="2" Content="_Chọn thư mục này" Click="SelectClick" IsDefault="True" Style="{StaticResource PrimaryButton}"/>
         </Grid>
     </Grid>
 </Window>
-

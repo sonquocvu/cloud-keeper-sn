@@ -16,6 +16,17 @@ public interface IStorageBrowserCapability
         CancellationToken cancellationToken);
 }
 
+public sealed record StorageItemPage(IReadOnlyList<StorageItem> Items, string? ContinuationToken, bool IsIncomplete = false);
+
+public interface IPagedStorageBrowserCapability : IStorageBrowserCapability
+{
+    Task<StorageItemPage> GetChildrenPageAsync(
+        string providerAccountId,
+        string parentItemId,
+        string? continuationToken,
+        CancellationToken cancellationToken);
+}
+
 public interface IStorageReadCapability
 {
     Task<Stream> OpenReadAsync(
@@ -64,8 +75,28 @@ public interface IStorageWriteSession : IAsyncDisposable
 public interface IProviderAuthenticationService
 {
     string ProviderId { get; }
+    bool IsConfigured { get; }
+    string? ConfigurationMessage { get; }
+    ProviderAuthenticationState State { get; }
+    event Action<ProviderAuthenticationState>? StateChanged;
     Task<StorageAccount?> GetCachedAccountAsync(CancellationToken cancellationToken);
     Task<StorageAccount> ConnectAsync(CancellationToken cancellationToken);
     Task DisconnectAsync(CancellationToken cancellationToken);
 }
 
+public enum ProviderAuthenticationStatus
+{
+    Disconnected,
+    OpeningBrowser,
+    CompletingConnection,
+    Connected,
+    ReauthenticationRequired,
+    Cancelled,
+    Failed,
+    Disconnecting
+}
+
+public sealed record ProviderAuthenticationState(
+    ProviderAuthenticationStatus Status,
+    string VietnameseMessage,
+    string? TechnicalCategory = null);

@@ -1,8 +1,6 @@
 # Testing
 
-## Commands
-
-With .NET 10 SDK installed:
+## Automated commands
 
 ```powershell
 dotnet restore CloudKeeperSN.sln
@@ -10,21 +8,19 @@ dotnet build CloudKeeperSN.sln --configuration Release --no-restore
 dotnet test CloudKeeperSN.sln --configuration Release --no-build
 ```
 
-Tests do not launch WPF or require live accounts.
+Các test mặc định hoàn toàn ngoại tuyến, không mở GUI và không cần credentials.
 
-## Test layout
+## Coverage trọng yếu
 
-- `CloudKeeperSN.Domain.Tests`: path preservation, OneDrive normalization/reserved names, deterministic conflict naming, Google-native exports, checksums, retry/`Retry-After`, state transitions, pause/resume, redaction, and cycle identity.
-- `CloudKeeperSN.Application.Tests`: fake-source scanning, duplicate Google names, shortcut/folder cycle behavior, cancellation, incremental decisions, and chunked fake OneDrive uploads without overwrite.
-- `CloudKeeperSN.Infrastructure.Tests`: SQLite migrations, stable identity mapping, crash recovery, and redaction before activity persistence.
-- `CloudKeeperSN.App.Tests`: navigation, disconnected states, backup enablement/validation, preview counts and filtering, confirmation safety text, pause/resume/cancel/retry, Vietnamese state mapping, result severity, theme persistence, settings validation, window restoration, demo determinism, and async-command disposal.
+- **Domain:** đường dẫn/identity, tên conflict xác định, native export policy, checksum, retry, state machine, redaction và cycle guard.
+- **Application/provider:** OAuth states, thiếu cấu hình, chống sign-in đồng thời, hủy/revoke, capability chỉ đọc, pagination nhiều trang/trang rỗng/token lặp, query escaping, duplicate ID, scan đệ quy, shortcut, native/unsupported/unknown-size, progress/cancellation và retry transient/non-transient.
+- **Infrastructure:** migration SQLite, email metadata, recovery, redaction, protected credential round-trip, plaintext không xuất hiện trên disk và lỗi giải mã an toàn.
+- **App:** navigation, accessibility-facing states, folder picker loading/error/cancel, demo workflow và production metadata preview; partial scan không được publish; transfer thật luôn bị vô hiệu hóa.
 
-SQLite tests use a unique directory under the OS temporary directory and remove it after each test instance.
+## Live integration tests
 
-## Optional integration tests
-
-None exist in Checkpoint 1. Later integration tests must live separately, require explicit opt-in configuration, use dedicated test accounts, and document scopes and cleanup. Unit tests must remain offline and use fakes.
+Chưa có live integration test tự động. Nếu bổ sung, phải đặt ở suite opt-in riêng, dùng tài khoản test chuyên dụng, không ghi dữ liệu, không dùng tài khoản cá nhân production, và không chạy trong unit-test mặc định. Không được thêm test gọi download/export chỉ để kiểm chứng metadata checkpoint.
 
 ## Manual checks deferred
 
-No interactive GUI smoke test or screenshot comparison is launched by the automated suite. Manually verify Vietnamese rendering, light/dark/system themes, keyboard navigation, dialogs, collapsed navigation, 100%/125%/150% scaling, and `%LOCALAPPDATA%\CloudKeeperSN` behavior on Windows.
+Automated suite không thể xác nhận trực quan hoặc tương tác thật với browser OAuth. Checklist thủ công nằm tại [ui-readiness-checklist.md](ui-readiness-checklist.md). Trong lần triển khai này, các mục đó được ghi rõ là **chưa thực hiện**, không được báo cáo như đã pass.

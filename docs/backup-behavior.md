@@ -2,9 +2,9 @@
 
 ## Direction and confirmation
 
-The MVP direction is Google Drive → OneDrive. Google Drive is source-only. A scan builds a dry-run preview containing file/folder counts, estimated source bytes, warnings, conflicts, export decisions, and planned destination paths. The first real upload cannot start until the user has seen that preview and explicitly confirmed it.
+The intended direction is Google Drive → a future destination. Google Drive is source-only. The current production scan builds a metadata-only preview containing file/folder counts, known estimated bytes, explicit unknown-size counts, warnings and export decisions.
 
-Checkpoint 1 implements the rules and boundaries but not the real scan/preview/transfer workflow.
+No real destination or transfer exists in this build. The start action is disabled and explains that no file has been downloaded, exported or transmitted. OneDrive transfer remains available only in clearly labelled demo mode.
 
 ## Folder and filename handling
 
@@ -37,5 +37,4 @@ The default chooses the strongest compatible evidence available: strong equal ha
 
 ## Recovery and retry
 
-Persistent states are validated. Interrupted downloading/uploading/verifying work becomes `RetryPending` on restart. Backoff is exponential with jitter, bounded by configuration, and never shorter than provider `Retry-After`. Retry is item/chunk scoped where the provider permits it.
-
+Persistent demo transfer states are validated. Interrupted downloading/uploading/verifying work becomes `RetryPending` on restart. Real Google metadata requests retry only transient categories with bounded exponential backoff and jitter; cancellation interrupts backoff. The current SDK mapping does not extract `Retry-After`, so future transfer work must add and test that header mapping before relying on it.

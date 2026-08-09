@@ -2,8 +2,6 @@ using CloudKeeperSN.App.Development;
 using CloudKeeperSN.App.ViewModels;
 using CloudKeeperSN.App.Views.Dialogs;
 using CloudKeeperSN.Application.Storage;
-using CloudKeeperSN.Providers.GoogleDrive.Fakes;
-using CloudKeeperSN.Providers.OneDrive.Fakes;
 
 namespace CloudKeeperSN.App.Services;
 
@@ -15,21 +13,28 @@ public interface IFolderPickerService
     Task<FolderSelection?> PickAsync(FolderPickerRequest request, CancellationToken cancellationToken);
 }
 
-public sealed class FolderPickerService(
-    FakeGoogleDriveProvider googleDrive,
-    FakeOneDriveProvider oneDrive) : IFolderPickerService
+public sealed class FolderPickerService(IEnumerable<IStorageProvider> providers) : IFolderPickerService
 {
     public async Task<FolderSelection?> PickAsync(FolderPickerRequest request, CancellationToken cancellationToken)
     {
-        IStorageBrowserCapability browser = request.ProviderId == "google-drive" ? googleDrive : oneDrive;
-        var folderWriter = request.ProviderId == "one-drive" ? oneDrive : null;
+        var provider = providers.SingleOrDefault(candidate => candidate.Descriptor.ProviderId == request.ProviderId)
+            ?? throw new InvalidOperationException($"Không có trình cung cấp thư mục cho {request.ProviderId}.");
+        var browser = provider as IStorageBrowserCapability
+            ?? throw new InvalidOperationException($"Trình cung cấp {request.ProviderId} không hỗ trợ duyệt thư mục.");
+        var folderWriter = request.CanCreateFolder ? provider as IStorageFolderWriteCapability : null;
         var viewModel = new FolderPickerViewModel(request, browser, folderWriter);
-        await viewModel.LoadAsync(cancellationToken);
-        var dialog = new FolderPickerDialog(viewModel)
+        try
         {
-            Owner = System.Windows.Application.Current.MainWindow
-        };
-        return dialog.ShowDialog() == true ? viewModel.SelectedFolder : null;
+            await viewModel.LoadAsync(cancellationToken);
+            var dialog = new FolderPickerDialog(viewModel)
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            return dialog.ShowDialog() == true ? viewModel.SelectedFolder : null;
+        }
+        finally
+        {
+            viewModel.Dispose();
+        }
     }
 }
-

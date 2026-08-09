@@ -15,7 +15,8 @@
                     <TextBlock Text="{Binding ProviderName}" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
                     <TextBlock Text="{Binding Description}" Style="{StaticResource SupportingText}" Margin="0,4,12,0"/>
                 </StackPanel>
-                <controls:StatusBadge Grid.Column="2" Text="{Binding Status.Text}" Tone="{Binding Status.Tone}" VerticalAlignment="Top"/>
+                <controls:StatusBadge Grid.Column="2" Text="{Binding Status.Text}" Tone="{Binding Status.Tone}" VerticalAlignment="Top"
+                                      automation:AutomationProperties.LiveSetting="Polite"/>
             </Grid>
             <Grid Grid.Row="1" Margin="56,18,0,0">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -24,15 +25,18 @@
                     <TextBlock Text="{Binding Email, TargetNullValue=Thông tin tài khoản sẽ hiển thị sau khi kết nối}" Style="{StaticResource CaptionText}" Margin="0,3,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="{Binding PrimaryActionText}" Command="{Binding ConnectCommand}" Style="{StaticResource PrimaryButton}" automation:AutomationProperties.Name="Kết nối tài khoản"/>
-                    <Button Content="Ngắt kết nối" Command="{Binding DisconnectCommand}" Style="{StaticResource DangerButton}" Margin="20,0,0,0" automation:AutomationProperties.HelpText="Chỉ xóa thông tin kết nối cục bộ; không thay đổi dữ liệu đám mây"/>
+                    <Button Content="{Binding PrimaryActionText}" Command="{Binding ConnectCommand}" Style="{StaticResource PrimaryButton}"
+                            ToolTip="{Binding DisabledExplanation}" ToolTipService.ShowOnDisabled="True"
+                            automation:AutomationProperties.Name="Kết nối tài khoản" automation:AutomationProperties.HelpText="{Binding DisabledExplanation}"/>
+                    <Button Content="_Hủy đăng nhập" Command="{Binding CancelConnectCommand}" Margin="8,0,0,0"
+                            Visibility="{Binding CanCancelConnection, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <Button Content="_Ngắt kết nối" Command="{Binding DisconnectCommand}" Style="{StaticResource DangerButton}" Margin="20,0,0,0" automation:AutomationProperties.HelpText="Chỉ xóa thông tin kết nối cục bộ; không thay đổi dữ liệu đám mây"/>
                 </StackPanel>
             </Grid>
             <Border Grid.Row="2" Margin="56,14,0,0" Padding="12" CornerRadius="7" Background="{DynamicResource ErrorSoft}"
                     Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}">
-                <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource Error}" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource Error}" TextWrapping="Wrap" automation:AutomationProperties.LiveSetting="Assertive"/>
             </Border>
         </Grid>
     </Border>
 </UserControl>
-

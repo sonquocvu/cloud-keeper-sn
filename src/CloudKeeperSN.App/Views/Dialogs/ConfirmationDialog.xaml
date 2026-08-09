@@ -9,8 +9,8 @@
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
             <TextBlock x:Name="TitleText" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level1" />
-            <TextBlock x:Name="MessageText" Grid.Row="1" Style="{StaticResource BodyText}" Margin="0,12,0,0" />
-            <TextBlock x:Name="SupportingText" Grid.Row="2" Style="{StaticResource SupportingText}" Margin="0,10,0,0" />
+            <TextBlock x:Name="MessageText" Grid.Row="1" Style="{StaticResource BodyText}" Margin="0,12,0,0" TextWrapping="Wrap" />
+            <TextBlock x:Name="SupportingText" Grid.Row="2" Style="{StaticResource SupportingText}" Margin="0,10,0,0" TextWrapping="Wrap" />
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
                 <Button x:Name="CancelButton" Click="CancelClick" Margin="0,0,8,0" IsCancel="True" />
                 <Button x:Name="ConfirmButton" Click="ConfirmClick" IsDefault="True" Style="{StaticResource PrimaryButton}" />
@@ -18,4 +18,3 @@
         </Grid>
     </Border>
 </Window>
-

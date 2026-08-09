@@ -19,6 +19,8 @@ public sealed class FolderPickerViewModel : ObservableObject, IDisposable
     private string? _errorMessage;
     private string _newFolderName = string.Empty;
     private string _currentFolderId;
+    private long _loadVersion;
+    private bool _isDisposed;
 
     public FolderPickerViewModel(FolderPickerRequest request, IStorageBrowserCapability browser, IStorageFolderWriteCapability? folderWriter)
     {
@@ -26,11 +28,13 @@ public sealed class FolderPickerViewModel : ObservableObject, IDisposable
         _browser = browser;
         _folderWriter = folderWriter;
         _currentFolderId = request.RootFolderId;
-        _breadcrumbs.Add(new BreadcrumbItemViewModel(request.RootFolderId, request.ProviderId == "google-drive" ? "Google Drive" : "OneDrive", request.ProviderId == "google-drive" ? "Google Drive" : "OneDrive"));
-        OpenFolderCommand = new AsyncParameterRelayCommand<FolderEntryViewModel>(OpenFolderAsync);
+        var rootName = request.ProviderId == "google-drive" ? "Drive của tôi" : "OneDrive";
+        _breadcrumbs.Add(new BreadcrumbItemViewModel(request.RootFolderId, rootName, rootName));
+        OpenFolderCommand = new AsyncParameterRelayCommand<FolderEntryViewModel>(OpenFolderAsync, _ => !IsLoading);
         GoUpCommand = new AsyncRelayCommand(GoUpAsync, () => _breadcrumbs.Count > 1 && !IsLoading);
         RetryCommand = new AsyncRelayCommand(LoadCurrentAsync, () => !IsLoading);
         CreateFolderCommand = new AsyncRelayCommand(CreateFolderAsync, () => CanCreateFolder && !string.IsNullOrWhiteSpace(NewFolderName) && !IsLoading);
+        CancelLoadingCommand = new RelayCommand(_ => CancelActiveOperations(), _ => IsLoading);
     }
 
     public string Title => _request.Title;
@@ -40,6 +44,7 @@ public sealed class FolderPickerViewModel : ObservableObject, IDisposable
     public ICommand GoUpCommand { get; }
     public ICommand RetryCommand { get; }
     public ICommand CreateFolderCommand { get; }
+    public ICommand CancelLoadingCommand { get; }
     public string CurrentPath => _breadcrumbs[^1].DisplayPath;
     public bool IsEmpty => !IsLoading && ErrorMessage is null && Folders.Count == 0;
     public FolderSelection SelectedFolder => new(_request.ProviderId, _request.AccountId, _currentFolderId, CurrentPath);
@@ -109,25 +114,37 @@ public sealed class FolderPickerViewModel : ObservableObject, IDisposable
 
     private async Task LoadCurrentAsync(CancellationToken cancellationToken)
     {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        var version = Interlocked.Increment(ref _loadVersion);
+        var folderId = _currentFolderId;
         IsLoading = true;
         ErrorMessage = null;
         Folders.Clear();
         SelectedEntry = null;
         try
         {
-            await foreach (var item in _browser.GetChildrenAsync(_request.AccountId, _currentFolderId, cancellationToken))
+            var folders = new List<FolderEntryViewModel>();
+            await foreach (var item in _browser.GetChildrenAsync(_request.AccountId, folderId, cancellationToken))
             {
-                if (item.Kind == StorageItemKind.Folder) Folders.Add(new FolderEntryViewModel(item.ItemId, item.Name));
+                if (item.Kind == StorageItemKind.Folder) folders.Add(new FolderEntryViewModel(item.ItemId, item.Name));
             }
+            if (version != Volatile.Read(ref _loadVersion) || _isDisposed) return;
+            foreach (var folder in folders) Folders.Add(folder);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            ErrorMessage = "Không thể tải thư mục. Dữ liệu đám mây vẫn an toàn. Vui lòng thử lại.";
+            if (version == Volatile.Read(ref _loadVersion) && !_isDisposed)
+                ErrorMessage = exception is ProviderOperationException failure
+                    ? ProviderFailureMessages.ToVietnamese(failure.Category)
+                    : "Không thể tải thư mục. Dữ liệu đám mây vẫn an toàn và chưa bị thay đổi. Vui lòng thử lại.";
         }
         finally
         {
-            IsLoading = false;
-            OnPropertyChanged(nameof(IsEmpty));
+            if (version == Volatile.Read(ref _loadVersion) && !_isDisposed)
+            {
+                IsLoading = false;
+                OnPropertyChanged(nameof(IsEmpty));
+            }
         }
     }
 
@@ -153,13 +170,27 @@ public sealed class FolderPickerViewModel : ObservableObject, IDisposable
 
     private void NotifyCommands()
     {
+        ((AsyncParameterRelayCommand<FolderEntryViewModel>)OpenFolderCommand).NotifyCanExecuteChanged();
         ((AsyncRelayCommand)GoUpCommand).NotifyCanExecuteChanged();
         ((AsyncRelayCommand)RetryCommand).NotifyCanExecuteChanged();
         ((AsyncRelayCommand)CreateFolderCommand).NotifyCanExecuteChanged();
+        ((RelayCommand)CancelLoadingCommand).RaiseCanExecuteChanged();
+    }
+
+    private void CancelActiveOperations()
+    {
+        ((AsyncParameterRelayCommand<FolderEntryViewModel>)OpenFolderCommand).Cancel();
+        ((AsyncRelayCommand)GoUpCommand).Cancel();
+        ((AsyncRelayCommand)RetryCommand).Cancel();
+        ((AsyncRelayCommand)CreateFolderCommand).Cancel();
     }
 
     public void Dispose()
     {
+        if (_isDisposed) return;
+        _isDisposed = true;
+        Interlocked.Increment(ref _loadVersion);
+        CancelActiveOperations();
         ((AsyncParameterRelayCommand<FolderEntryViewModel>)OpenFolderCommand).Dispose();
         ((AsyncRelayCommand)GoUpCommand).Dispose();
         ((AsyncRelayCommand)RetryCommand).Dispose();

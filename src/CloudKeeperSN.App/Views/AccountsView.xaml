@@ -4,10 +4,13 @@
              xmlns:controls="clr-namespace:CloudKeeperSN.App.Controls">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="{StaticResource PagePadding}" MaxWidth="1040" HorizontalAlignment="Stretch">
-            <controls:InlineNotification Title="Kết nối an toàn trong chế độ trình diễn" Message="{Binding PageMessage}" Margin="0,0,0,20"/>
+            <controls:InlineNotification Title="Kết nối tài khoản an toàn" Message="{Binding PageMessage}" Margin="0,0,0,12"/>
+            <controls:InlineNotification Title="Google Drive luôn là nguồn chỉ đọc"
+                                         Message="CloudKeeperSN chỉ có quyền đọc dữ liệu Google Drive. Ứng dụng không thể sửa hoặc xóa dữ liệu nguồn."
+                                         Margin="0,0,0,20"/>
             <controls:ProviderAccountCard DataContext="{Binding GoogleDrive}"/>
             <controls:ProviderAccountCard DataContext="{Binding OneDrive}"/>
-            <TextBlock Text="CloudKeeperSN không thu thập hoặc lưu mật khẩu Google hay Microsoft. Khi tích hợp thật được bổ sung, cửa sổ đăng nhập hệ thống sẽ được sử dụng." Style="{StaticResource SupportingText}" Margin="4,4,4,0"/>
+            <TextBlock Text="CloudKeeperSN không thu thập hoặc lưu mật khẩu Google hay Microsoft. Đăng nhập Google thật luôn mở trong trình duyệt hệ thống." Style="{StaticResource SupportingText}" Margin="4,4,4,0" TextWrapping="Wrap"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

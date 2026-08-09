@@ -12,11 +12,14 @@ public enum StorageItemKind
 
 public enum StorageCapabilityKind
 {
+    Authenticate,
     Browse,
+    ReadMetadata,
     Read,
     Write,
     CreateFolder,
     ResumableUpload,
+    PlanNativeExport,
     ExportNativeFile,
     ProviderChecksum
 }
@@ -27,7 +30,8 @@ public sealed record StorageAccount(
     string ProviderAccountId,
     string DisplayName,
     bool IsConnected,
-    DateTimeOffset? LastConnectedAtUtc);
+    DateTimeOffset? LastConnectedAtUtc,
+    string? Email = null);
 
 public sealed record ProviderChecksum(string Algorithm, string Value)
 {
@@ -58,4 +62,3 @@ public sealed record StorageProviderDescriptor(
 {
     public bool Supports(StorageCapabilityKind capability) => Capabilities.Contains(capability);
 }
-

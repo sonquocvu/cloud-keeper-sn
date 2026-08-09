@@ -1,39 +1,32 @@
 # CloudKeeperSN
 
-CloudKeeperSN là ứng dụng WPF dành cho Windows 10/11, hướng tới quản lý dữ liệu đám mây cá nhân lâu dài. Phiên bản hiện tại cung cấp giao diện hoàn chỉnh để **trình diễn an toàn bằng dữ liệu giả lập** quy trình sao lưu một chiều từ Google Drive sang OneDrive.
+CloudKeeperSN là ứng dụng WPF cho Windows 10/11. Bản dựng hiện tại có hai chế độ tách biệt:
 
-## Hiện đã có
+- **Chế độ thực:** đăng nhập Google Drive bằng trình duyệt hệ thống, duyệt thư mục, quét đệ quy siêu dữ liệu và lập bản xem trước. Google Drive là nguồn **chỉ đọc tuyệt đối**.
+- **Chế độ trình diễn:** dùng provider giả để trình diễn toàn bộ luồng Google Drive → OneDrive mà không truy cập dịch vụ thật.
 
-- kiến trúc Domain/Application/Infrastructure/provider độc lập;
-- mô hình khả năng lưu trữ không phụ thuộc Google hoặc Microsoft;
-- SQLite có migration, trạng thái phục hồi, lịch sử và ánh xạ danh tính;
-- trình cung cấp Google Drive và OneDrive giả lập để kiểm thử ngoại tuyến;
-- hệ thống thiết kế WPF dùng màu ngữ nghĩa, giao diện sáng/tối/theo Windows;
-- khung ứng dụng responsive với năm trang: Tổng quan, Tài khoản, Sao lưu, Lịch sử, Cài đặt;
-- kết nối/ngắt kết nối tài khoản giả lập;
-- trình chọn thư mục, tạo thư mục OneDrive giả lập và bản xem trước bắt buộc;
-- mô phỏng sao lưu có tiến độ, tạm dừng, tiếp tục, hủy, thử lại và kết quả xác minh;
-- lịch sử có tìm kiếm/bộ lọc và xuất thông tin chẩn đoán đã ẩn dữ liệu nhạy cảm;
-- lưu lựa chọn giao diện, cài đặt truyền dữ liệu và vị trí cửa sổ;
-- kiểm thử tự động cho quy tắc an toàn, persistence, provider giả và view model UI.
+Trong chế độ thực chưa có đích lưu trữ và chưa có truyền dữ liệu. Nút **Bắt đầu sao lưu** bị vô hiệu hóa với giải thích rõ ràng. Ứng dụng không gọi API tải xuống/xuất nội dung và không cung cấp khả năng ghi, xóa, di chuyển hoặc đổi tên trên Google Drive.
 
-## Chưa có
+## Chức năng hiện có
 
-- đăng nhập Google/Microsoft thật;
-- Google Drive API hoặc Microsoft Graph API;
-- quét, tải xuống hoặc tải lên dữ liệu đám mây thật;
-- xóa, di chuyển, ghi đè, cách ly hoặc đồng bộ hai chiều;
-- phát hiện tệp trùng, ảnh tương tự, lịch chạy hoặc dọn dẹp.
+- OAuth 2.0 installed-app với PKCE, trình duyệt hệ thống và loopback receiver trên cổng trống;
+- đúng một scope Google: `https://www.googleapis.com/auth/drive.readonly`;
+- token được DPAPI bảo vệ theo Windows CurrentUser; SQLite chỉ lưu metadata tài khoản;
+- trạng thái kết nối/hủy/lỗi/đăng nhập lại và ngắt kết nối có xác nhận;
+- duyệt `Drive của tôi` theo trang, hủy/thử lại, chặn continuation token lặp;
+- quét đệ quy metadata-only, nhận diện duplicate theo item ID, shortcut, kích thước chưa rõ và lỗi một phần;
+- kế hoạch Google Docs → `.docx`, Sheets → `.xlsx`, Slides → `.pptx`, Drawings → `.png`; loại native khác được đánh dấu không hỗ trợ;
+- retry có exponential backoff, jitter, giới hạn và tôn trọng hủy;
+- theme sáng/tối/theo Windows/high contrast, nhãn trạng thái bằng chữ và hỗ trợ bàn phím;
+- SQLite có migration, lịch sử, cài đặt và chẩn đoán được redaction;
+- bộ provider giả và luồng sao lưu trình diễn ngoại tuyến.
 
-Giao diện luôn dùng ngôn ngữ an toàn: **Google Drive là nguồn**, **OneDrive là nơi lưu bản sao**, **không xóa dữ liệu nguồn**, và **không ghi đè theo mặc định**.
+## Yêu cầu
 
-## Yêu cầu phát triển
+- Windows 10 build 19041+ hoặc Windows 11;
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
-- Windows 10 build 19041 trở lên hoặc Windows 11;
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0);
-- Visual Studio với workload “.NET desktop development”, hoặc dòng lệnh `dotnet`.
-
-## Xây dựng và kiểm thử
+## Build và test
 
 ```powershell
 dotnet restore CloudKeeperSN.sln
@@ -41,11 +34,24 @@ dotnet build CloudKeeperSN.sln --configuration Release --no-restore
 dotnet test CloudKeeperSN.sln --configuration Release --no-build
 ```
 
-Unit test không cần tài khoản đám mây và không mở WPF.
+Unit test không mở WPF và không cần tài khoản đám mây.
 
-## Chạy chế độ trình diễn
+## Chạy với Google Drive thật
 
-Debug build tự bật dữ liệu trình diễn. Release build chỉ bật khi được yêu cầu rõ ràng:
+Tạo OAuth client loại **Desktop app**, bật Google Drive API, rồi đặt biến môi trường trong phiên PowerShell. Không commit giá trị thật:
+
+```powershell
+$env:CLOUDKEEPERSN_DEMO_MODE='false'
+$env:CLOUDKEEPERSN_GOOGLE_CLIENT_ID='...apps.googleusercontent.com'
+$env:CLOUDKEEPERSN_GOOGLE_CLIENT_SECRET='...'
+dotnet run --project src/CloudKeeperSN.App/CloudKeeperSN.App.csproj --configuration Release
+```
+
+Xem quy trình đầy đủ và yêu cầu Google verification trong [OAuth setup](docs/oauth-setup.md). Ứng dụng không đọc file `.env` tự động; [.env.example](.env.example) chỉ liệt kê tên biến.
+
+## Chế độ trình diễn
+
+Debug build mặc định dùng demo; Release chỉ dùng demo khi được yêu cầu:
 
 ```powershell
 $env:CLOUDKEEPERSN_DEMO_MODE='true'
@@ -53,17 +59,14 @@ $env:CLOUDKEEPERSN_DEMO_SCENARIO='Standard'
 dotnet run --project src/CloudKeeperSN.App/CloudKeeperSN.App.csproj
 ```
 
-Các kịch bản hợp lệ được mô tả trong [docs/demo-scenarios.md](docs/demo-scenarios.md). Giao diện luôn hiển thị nhãn **Chế độ trình diễn** khi dữ liệu giả đang hoạt động.
-
-Không cần cấu hình OAuth cho giao diện giả lập. `.env.example` chỉ là mẫu an toàn; không commit client secret, token, mật khẩu hoặc authorization code.
+Giao diện luôn hiện nhãn **Chế độ trình diễn** khi provider giả hoạt động. Xem [demo scenarios](docs/demo-scenarios.md).
 
 ## Dữ liệu cục bộ
 
-- cơ sở dữ liệu: `%LOCALAPPDATA%\CloudKeeperSN\cloudkeeper.db`;
-- nhật ký: `%LOCALAPPDATA%\CloudKeeperSN\Logs\`;
-- bộ nhớ tạm: `%LOCALAPPDATA%\CloudKeeperSN\Cache\`.
+- SQLite: `%LOCALAPPDATA%\CloudKeeperSN\cloudkeeper.db`
+- token đã mã hóa: `%LOCALAPPDATA%\CloudKeeperSN\Credentials\google-drive\`
+- log/cache: `%LOCALAPPDATA%\CloudKeeperSN\Logs\` và `Cache\`
 
-**Xóa bộ nhớ tạm** chỉ xóa thư mục Cache riêng của CloudKeeperSN. Ngắt kết nối giả lập giữ nguyên lịch sử. Không có thao tác UI nào xóa dữ liệu Google Drive hoặc OneDrive.
+Ngắt kết nối cố gắng revoke token và luôn xóa token cache cục bộ; không thay đổi tệp đám mây.
 
-Xem thêm: [kiến trúc](docs/architecture.md), [hệ thống thiết kế UI](docs/ui-design-system.md), [bất biến an toàn](docs/safety-invariants.md), [hành vi sao lưu](docs/backup-behavior.md), [kiểm thử](docs/testing.md).
-
+Tài liệu: [kiến trúc](docs/architecture.md), [provider Google chỉ đọc](docs/google-drive-readonly.md), [hành vi sao lưu](docs/backup-behavior.md), [bất biến an toàn](docs/safety-invariants.md), [kiểm thử](docs/testing.md), [UI/accessibility checklist](docs/ui-readiness-checklist.md).

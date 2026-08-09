@@ -8,7 +8,7 @@ public sealed class SafetyUtilityTests
     [Fact]
     public void Redactor_RemovesTokensAuthorizationCodesAndPasswords()
     {
-        const string input = "Authorization: Bearer token123 access_token=abc&code=secret-code password=hunter2";
+        const string input = "Authorization: Bearer token123 access_token=abc&code=secret-code&state=oauth-state password=hunter2 code_verifier=pkce-secret-value";
 
         var result = SensitiveDataRedactor.Redact(input);
 
@@ -16,6 +16,8 @@ public sealed class SafetyUtilityTests
         Assert.DoesNotContain("abc", result);
         Assert.DoesNotContain("secret-code", result);
         Assert.DoesNotContain("hunter2", result);
+        Assert.DoesNotContain("oauth-state", result);
+        Assert.DoesNotContain("pkce-secret-value", result);
         Assert.Contains("[ĐÃ ẨN]", result);
     }
 
@@ -29,4 +31,3 @@ public sealed class SafetyUtilityTests
         Assert.True(guard.TryEnter("account-b", "folder-1"));
     }
 }
-

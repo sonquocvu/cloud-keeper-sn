@@ -61,6 +61,36 @@ public sealed class SourceScannerTests
             new SourceScanner(provider).ScanAsync("fake-google-account", "root", cancellation.Token));
     }
 
+    [Fact]
+    public async Task Scan_ClassifiesNativeFilesUnknownSizesAndShortcutsWithoutReadingContent()
+    {
+        var provider = new FakeGoogleDriveProvider();
+        provider.Connect();
+        provider.AddItem("root", Native("document", "Kế hoạch", GoogleNativeExportPolicy.GoogleDocument));
+        provider.AddItem("root", Native("form", "Khảo sát", "application/vnd.google-apps.form"));
+        provider.AddItem("root", new StorageItem
+        {
+            ProviderId = "google-drive",
+            ProviderAccountId = "fake-google-account",
+            ItemId = "shortcut",
+            Name = "Lối tắt",
+            Kind = StorageItemKind.Shortcut,
+            MimeType = GoogleNativeExportPolicy.GoogleShortcut
+        });
+        var progress = new List<SourceScanProgress>();
+
+        var result = await new SourceScanner(provider).ScanAsync(
+            "fake-google-account", "root", CancellationToken.None, new InlineProgress<SourceScanProgress>(progress.Add));
+
+        Assert.Equal(2, result.FileCount);
+        Assert.Equal(2, result.NativeFileCount);
+        Assert.Equal(1, result.UnsupportedNativeFileCount);
+        Assert.Equal(2, result.UnknownSizeCount);
+        Assert.Equal(1, result.ShortcutCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.NotEmpty(progress);
+    }
+
     private static StorageItem File(string id, string name, long size) => new()
     {
         ProviderId = "google-drive",
@@ -80,4 +110,20 @@ public sealed class SourceScannerTests
         Name = name,
         Kind = StorageItemKind.Folder
     };
+
+    private static StorageItem Native(string id, string name, string mimeType) => new()
+    {
+        ProviderId = "google-drive",
+        ProviderAccountId = "fake-google-account",
+        ItemId = id,
+        ParentItemId = "root",
+        Name = name,
+        Kind = StorageItemKind.ProviderNativeFile,
+        MimeType = mimeType
+    };
+
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
+    }
 }

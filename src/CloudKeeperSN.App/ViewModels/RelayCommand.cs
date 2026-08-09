@@ -66,12 +66,14 @@ public sealed class AsyncRelayCommand : ObservableObject, ICommand, IDisposable
     }
 }
 
-public sealed class AsyncParameterRelayCommand<T>(Func<T, CancellationToken, Task> execute) : ICommand, IDisposable where T : class
+public sealed class AsyncParameterRelayCommand<T>(
+    Func<T, CancellationToken, Task> execute,
+    Func<T, bool>? canExecute = null) : ICommand, IDisposable where T : class
 {
     private CancellationTokenSource? _cancellation;
     private bool _isRunning;
     public event EventHandler? CanExecuteChanged;
-    public bool CanExecute(object? parameter) => !_isRunning && parameter is T;
+    public bool CanExecute(object? parameter) => !_isRunning && parameter is T value && (canExecute?.Invoke(value) ?? true);
     public async void Execute(object? parameter)
     {
         if (parameter is not T value || !CanExecute(parameter)) return;
@@ -82,5 +84,7 @@ public sealed class AsyncParameterRelayCommand<T>(Func<T, CancellationToken, Tas
         catch (OperationCanceledException) when (_cancellation.IsCancellationRequested) { }
         finally { _cancellation.Dispose(); _cancellation = null; _isRunning = false; CanExecuteChanged?.Invoke(this, EventArgs.Empty); }
     }
+    public void Cancel() => _cancellation?.Cancel();
+    public void NotifyCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     public void Dispose() { _cancellation?.Cancel(); _cancellation?.Dispose(); }
 }

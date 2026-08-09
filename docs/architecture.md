@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document describes the domain foundation and the fake-provider UI showcase. Real Google Drive and Microsoft Graph adapters are intentionally absent.
+This document describes the domain foundation, the real read-only Google Drive provider, and the isolated fake-provider UI showcase. Microsoft Graph remains intentionally absent.
 
 ## Dependency direction
 
@@ -37,11 +37,11 @@ Migration 1 creates tables for accounts (metadata only), backup definitions, run
 
 ## Streaming boundary
 
-`IStorageReadCapability` returns a stream and `IStorageWriteSession` accepts chunks. The fake implementation buffers only for deterministic tests. Real adapters must use bounded buffers and resumable OneDrive upload sessions. The transfer engine is a later checkpoint.
+`IStorageReadCapability` returns a stream and `IStorageWriteSession` accepts chunks, but the real Google provider implements neither. Only fake providers exercise content transfer for deterministic demo tests. A future destination/transfer checkpoint must use bounded buffers and resumable upload sessions.
 
 ## Authentication boundary
 
-`IProviderAuthenticationService` is provider-specific. Future implementations must open the system browser, request minimal scopes, and store cached tokens with Windows DPAPI. Account rows contain metadata only. Password forms are prohibited.
+`GoogleAuthenticationService` uses system-browser installed-app OAuth with PKCE and a loopback receiver. `ProtectedGoogleDataStore` encrypts token blobs using Windows DPAPI CurrentUser outside SQLite. Account rows contain metadata only. Password forms are prohibited.
 
 ## Package decisions
 
@@ -52,13 +52,16 @@ Versions are centrally pinned in `Directory.Packages.props`:
 - `Microsoft.Extensions.DependencyInjection` 10.0.10: composition root for WPF.
 - xUnit 2.9.3, Visual Studio runner 3.1.5, and Microsoft.NET.Test.Sdk 18.8.1: offline unit-test stack with .NET 10 support.
 
-No Google or Microsoft SDK dependency is added before its provider checkpoint.
+- `Google.Apis.Auth` / `Google.Apis.Drive.v3` 1.75.0: official .NET OAuth/Drive SDKs, isolated inside the Google provider assembly.
+- `System.Security.Cryptography.ProtectedData` 10.0.10: Windows DPAPI token protection.
+
+No Microsoft Graph dependency is present.
 
 ## UI
 
 The WPF application uses a lightweight internal `INotifyPropertyChanged`/`ICommand` foundation. `MainWindowViewModel` owns navigation and page view models own workflow state. Views contain presentation only; code-behind is limited to dialog results and window placement.
 
-Semantic resource dictionaries provide light/dark themes, typography, spacing, and standard control states. `ThemeService` persists the preference in SQLite and swaps only the theme dictionary. `WindowPlacementService` persists bounds; `WindowPlacementValidator` restores off-screen windows to the visible desktop.
+Semantic resource dictionaries provide light/dark/high-contrast themes, typography, spacing, and standard control states. `ThemeService` persists the preference, follows Windows theme changes in System mode and uses system colors in high contrast. `WindowPlacementService` persists bounds; `WindowPlacementValidator` restores off-screen windows to the visible desktop.
 
 `DemoDataService`, `DemoBackupPlanner`, and `DemoTransferEngine` are UI-development adapters around the existing fake providers. They are explicitly gated by `DemoConfiguration`, use deterministic scenarios, and never masquerade as live provider data. The guided workflow requires a preview and confirmation before the fake engine starts.
 

@@ -6,7 +6,7 @@ CloudKeeperSN should feel trustworthy, calm, modern, practical, and protective w
 
 ## Semantic resources
 
-Views must use `DynamicResource` semantic brushes from `UI/Themes/LightTheme.xaml` and `DarkTheme.xaml`:
+Views must use `DynamicResource` semantic brushes from `UI/Themes/LightTheme.xaml`, `DarkTheme.xaml`, and system colors supplied by `HighContrastTheme.xaml`:
 
 - `BackgroundPrimary`, `BackgroundSecondary`
 - `SurfacePrimary`, `SurfaceElevated`
@@ -22,7 +22,7 @@ Do not add raw colors to page views. The only intentional fixed color is white t
 
 ## Themes
 
-The default is **Theo cài đặt Windows**. `ThemeService` resolves the Windows app-theme preference on startup, swaps one resource dictionary without recreating views, and persists `System`, `Light`, or `Dark` in SQLite. Dark mode avoids pure black/white.
+The default is **Theo cài đặt Windows**. `ThemeService` resolves the Windows app-theme preference on startup and on Windows preference changes, swaps one resource dictionary without recreating views, and persists `System`, `Light`, or `Dark` in SQLite. Windows High Contrast overrides the palette with `SystemColors`. Dark mode avoids pure black/white.
 
 All future controls must consume semantic resources. Never create a separate dark copy of a page.
 
@@ -80,4 +80,3 @@ Do not imply bidirectional synchronization, moving, cleanup, duplicate deletion,
 ## Manual visual inspection
 
 No screenshot or interactive GUI validation is performed by the automated suite. On a Windows desktop, inspect light/dark/system modes at 100%, 125%, and 150% scaling; verify the 1100 × 700 minimum, collapsed navigation, keyboard focus, dialogs, long lists, and high-contrast readability.
-

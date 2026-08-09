@@ -55,3 +55,26 @@ public interface IApplicationSettingRepository
     Task SetAsync(string key, string value, CancellationToken cancellationToken);
 }
 
+public interface ICredentialProtector
+{
+    byte[] Protect(ReadOnlySpan<byte> plaintext, string purpose);
+    byte[] Unprotect(ReadOnlySpan<byte> protectedData, string purpose);
+}
+
+public interface IProtectedCredentialStore
+{
+    Task<byte[]?> GetAsync(string providerId, string key, CancellationToken cancellationToken);
+    Task StoreAsync(string providerId, string key, ReadOnlyMemory<byte> value, CancellationToken cancellationToken);
+    Task DeleteAsync(string providerId, string key, CancellationToken cancellationToken);
+    Task ClearProviderAsync(string providerId, CancellationToken cancellationToken);
+}
+
+public sealed class ProtectedCredentialException : Exception
+{
+    public ProtectedCredentialException(string message, Exception? innerException = null) : base(message, innerException) { }
+}
+
+public interface IProviderDiagnostics
+{
+    Task WriteAsync(string eventType, string vietnameseMessage, string? technicalDetails, CancellationToken cancellationToken);
+}

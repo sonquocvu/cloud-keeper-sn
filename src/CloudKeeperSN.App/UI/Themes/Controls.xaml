@@ -86,6 +86,26 @@
         <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtle}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource DefaultFocusVisual}" />
     </Style>
+    <Style TargetType="ComboBoxItem">
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="Background" Value="{DynamicResource SurfacePrimary}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource DefaultFocusVisual}" />
+        <Style.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource TextDisabled}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
     <Style TargetType="ListBox">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -123,4 +143,3 @@
         </Setter>
     </Style>
 </ResourceDictionary>
-

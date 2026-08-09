@@ -17,6 +17,20 @@ public sealed class SqlitePersistenceTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task AccountMigrationPersistsEmailAsNonSensitiveMetadata()
+    {
+        var repository = new SqliteStorageAccountRepository(_database, _factory);
+        var account = new CloudKeeperSN.Domain.Storage.StorageAccount(
+            "google:current", "google-drive", "permission-42", "Nguyễn An", true, DateTimeOffset.UtcNow, "an@example.test");
+
+        await repository.UpsertAsync(account, CancellationToken.None);
+        var restored = Assert.Single(await repository.GetAllAsync(CancellationToken.None));
+
+        Assert.Equal(account.Email, restored.Email);
+        Assert.Equal(account.ProviderAccountId, restored.ProviderAccountId);
+    }
+
+    [Fact]
     public async Task Mapping_UpsertPreservesStableDestinationIdentity()
     {
         var repository = new SqliteTransferMappingRepository(_database, _factory);

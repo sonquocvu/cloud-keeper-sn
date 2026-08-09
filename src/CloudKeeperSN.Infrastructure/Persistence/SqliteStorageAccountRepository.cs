@@ -13,14 +13,15 @@ public sealed class SqliteStorageAccountRepository(
         await using var connection = await connectionFactory.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            INSERT INTO connected_accounts(id, provider_id, provider_account_id, display_name, is_connected, last_connected_at_utc)
-            VALUES ($id, $providerId, $providerAccountId, $displayName, $isConnected, $lastConnectedAt)
+            INSERT INTO connected_accounts(id, provider_id, provider_account_id, display_name, is_connected, last_connected_at_utc, email)
+            VALUES ($id, $providerId, $providerAccountId, $displayName, $isConnected, $lastConnectedAt, $email)
             ON CONFLICT(id) DO UPDATE SET
                 provider_id = excluded.provider_id,
                 provider_account_id = excluded.provider_account_id,
                 display_name = excluded.display_name,
                 is_connected = excluded.is_connected,
-                last_connected_at_utc = excluded.last_connected_at_utc
+                last_connected_at_utc = excluded.last_connected_at_utc,
+                email = excluded.email
             """;
         command.Parameters.AddWithValue("$id", account.Id);
         command.Parameters.AddWithValue("$providerId", account.ProviderId);
@@ -28,6 +29,7 @@ public sealed class SqliteStorageAccountRepository(
         command.Parameters.AddWithValue("$displayName", account.DisplayName);
         command.Parameters.AddWithValue("$isConnected", account.IsConnected);
         command.Parameters.AddWithValue("$lastConnectedAt", DbValue(account.LastConnectedAtUtc));
+        command.Parameters.AddWithValue("$email", account.Email ?? (object)DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -36,14 +38,15 @@ public sealed class SqliteStorageAccountRepository(
         await database.InitializeAsync(cancellationToken);
         await using var connection = await connectionFactory.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT id, provider_id, provider_account_id, display_name, is_connected, last_connected_at_utc FROM connected_accounts ORDER BY provider_id";
+        command.CommandText = "SELECT id, provider_id, provider_account_id, display_name, is_connected, last_connected_at_utc, email FROM connected_accounts ORDER BY provider_id";
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var accounts = new List<StorageAccount>();
         while (await reader.ReadAsync(cancellationToken))
         {
             accounts.Add(new StorageAccount(
                 reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetBoolean(4),
-                reader.IsDBNull(5) ? null : DateTimeOffset.Parse(reader.GetString(5))));
+                reader.IsDBNull(5) ? null : DateTimeOffset.Parse(reader.GetString(5)),
+                reader.IsDBNull(6) ? null : reader.GetString(6)));
         }
         return accounts;
     }

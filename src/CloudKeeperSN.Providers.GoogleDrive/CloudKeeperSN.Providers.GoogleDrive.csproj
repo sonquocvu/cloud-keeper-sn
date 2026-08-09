@@ -3,5 +3,8 @@
     <ProjectReference Include="..\CloudKeeperSN.Application\CloudKeeperSN.Application.csproj" />
     <ProjectReference Include="..\CloudKeeperSN.Domain\CloudKeeperSN.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" />
+    <PackageReference Include="Google.Apis.Drive.v3" />
+  </ItemGroup>
 </Project>
-

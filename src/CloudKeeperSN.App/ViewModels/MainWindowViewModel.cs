@@ -36,8 +36,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ObservableCollection<NavigationItemViewModel> NavigationItems { get; }
     public ICommand NavigateCommand { get; }
     public bool IsDemoMode { get; init; }
-    public string EnvironmentLabel => IsDemoMode ? "Chế độ trình diễn" : "Dữ liệu cục bộ";
-    public string VersionLabel => "Phiên bản 0.2.0";
+    public string EnvironmentLabel => IsDemoMode ? "Chế độ trình diễn" : "Google Drive chỉ đọc";
+    public string VersionLabel => "Phiên bản 0.3.0";
 
     public PageViewModel CurrentPage
     {

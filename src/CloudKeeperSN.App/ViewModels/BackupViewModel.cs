@@ -1,8 +1,14 @@
 using System.Collections.ObjectModel;
+using System.Text.Json;
 using System.Windows.Input;
 using CloudKeeperSN.App.Development;
 using CloudKeeperSN.App.Presentation;
 using CloudKeeperSN.App.Services;
+using CloudKeeperSN.Application.Persistence;
+using CloudKeeperSN.Application.Scanning;
+using CloudKeeperSN.Application.Storage;
+using CloudKeeperSN.Domain.Export;
+using CloudKeeperSN.Domain.Storage;
 using CloudKeeperSN.Domain.Transfers;
 
 namespace CloudKeeperSN.App.ViewModels;
@@ -46,6 +52,7 @@ public sealed record BackupPreviewViewState(
     int ExportCount,
     int UnsupportedCount,
     int WarningCount,
+    int UnknownSizeCount,
     IReadOnlyList<PreviewItemViewModel> Items,
     IReadOnlyList<string> Warnings)
 {
@@ -67,6 +74,7 @@ public sealed record BackupPreviewViewState(
             exportCount,
             items.Count(item => item.Category == PreviewItemCategory.Unsupported),
             warnings.Count + items.Count(item => item.Category is PreviewItemCategory.Warning or PreviewItemCategory.Unsupported),
+            items.Count(item => item.Size is null),
             items,
             warnings);
 }
@@ -91,6 +99,9 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
     private readonly DemoTransferEngine _transferEngine;
     private readonly IFolderPickerService _folderPicker;
     private readonly IDialogService _dialogs;
+    private readonly bool _isDemoMode;
+    private readonly IStorageProvider? _realGoogleProvider;
+    private readonly IApplicationSettingRepository? _settings;
     private readonly List<PreviewItemViewModel> _allPreviewItems = [];
     private CancellationTokenSource? _runCancellation;
     private bool _googleConnected;
@@ -114,6 +125,10 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
     private int _failedCount;
     private int _retryCount;
     private BackupResultViewModel? _result;
+    private string? _realGoogleAccountId;
+    private string _accountDisplayName = "Google Drive";
+    private string _scanProgressText = "Chưa bắt đầu quét.";
+    private string? _scanErrorMessage;
 
     public BackupViewModel(
         DemoDataService demoData,
@@ -121,13 +136,53 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         DemoTransferEngine transferEngine,
         IFolderPickerService folderPicker,
         IDialogService dialogs)
-        : base("backup", "Sao lưu một chiều", "Google Drive là nguồn; OneDrive là nơi lưu bản sao.")
+        : this(demoData, planner, transferEngine, folderPicker, dialogs, true, null, null)
+    {
+    }
+
+    public BackupViewModel(
+        DemoDataService demoData,
+        DemoBackupPlanner planner,
+        DemoTransferEngine transferEngine,
+        IFolderPickerService folderPicker,
+        IDialogService dialogs,
+        DemoConfiguration configuration,
+        IEnumerable<IStorageProvider> providers,
+        IApplicationSettingRepository settings)
+        : this(
+            demoData,
+            planner,
+            transferEngine,
+            folderPicker,
+            dialogs,
+            configuration.IsEnabled,
+            providers.SingleOrDefault(provider => provider.Descriptor.ProviderId == "google-drive"),
+            settings)
+    {
+    }
+
+    private BackupViewModel(
+        DemoDataService demoData,
+        DemoBackupPlanner planner,
+        DemoTransferEngine transferEngine,
+        IFolderPickerService folderPicker,
+        IDialogService dialogs,
+        bool isDemoMode,
+        IStorageProvider? realGoogleProvider,
+        IApplicationSettingRepository? settings)
+        : base(
+            "backup",
+            isDemoMode ? "Sao lưu một chiều" : "Quét Google Drive chỉ đọc",
+            isDemoMode ? "Google Drive là nguồn; OneDrive là nơi lưu bản sao." : "Duyệt, quét siêu dữ liệu và lập kế hoạch; chưa truyền nội dung tệp.")
     {
         _demoData = demoData;
         _planner = planner;
         _transferEngine = transferEngine;
         _folderPicker = folderPicker;
         _dialogs = dialogs;
+        _isDemoMode = isDemoMode;
+        _realGoogleProvider = realGoogleProvider;
+        _settings = settings;
         PreviewFilters =
         [
             new("all", "Tất cả", null),
@@ -141,7 +196,8 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         SelectSourceCommand = new AsyncRelayCommand(SelectSourceAsync, () => _googleConnected && Stage == BackupWorkflowStage.Setup);
         SelectDestinationCommand = new AsyncRelayCommand(SelectDestinationAsync, () => _oneDriveConnected && Stage == BackupWorkflowStage.Setup);
         ScanCommand = new AsyncRelayCommand(ScanAsync, () => CanScan);
-        StartBackupCommand = new AsyncRelayCommand(StartBackupAsync, () => Stage == BackupWorkflowStage.Preview && Preview is not null);
+        StartBackupCommand = new AsyncRelayCommand(StartBackupAsync, () => IsDemoMode && Stage == BackupWorkflowStage.Preview && Preview is not null);
+        CancelScanCommand = new RelayCommand(_ => ((AsyncRelayCommand)ScanCommand).Cancel(), _ => IsScanning);
         PauseCommand = new RelayCommand(_ => Pause(), _ => Stage == BackupWorkflowStage.Running && !IsPaused);
         ResumeCommand = new RelayCommand(_ => Resume(), _ => Stage == BackupWorkflowStage.Running && IsPaused);
         CancelCommand = new AsyncRelayCommand(CancelAsync, () => Stage == BackupWorkflowStage.Running);
@@ -156,6 +212,7 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
     public ICommand SelectDestinationCommand { get; }
     public ICommand ScanCommand { get; }
     public ICommand StartBackupCommand { get; }
+    public ICommand CancelScanCommand { get; }
     public ICommand PauseCommand { get; }
     public ICommand ResumeCommand { get; }
     public ICommand CancelCommand { get; }
@@ -168,17 +225,27 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
     public bool IsPreview => Stage == BackupWorkflowStage.Preview;
     public bool IsRunning => Stage == BackupWorkflowStage.Running;
     public bool IsResult => Stage == BackupWorkflowStage.Result;
+    public bool IsDemoMode => _isDemoMode;
+    public bool IsProductionMode => !_isDemoMode;
+    public string AccountDisplayName { get => _accountDisplayName; private set => SetProperty(ref _accountDisplayName, value); }
     public FolderSelectionViewModel? SourceFolder { get => _sourceFolder; private set { if (SetProperty(ref _sourceFolder, value)) NotifyState(); } }
     public FolderSelectionViewModel? DestinationFolder { get => _destinationFolder; private set { if (SetProperty(ref _destinationFolder, value)) NotifyState(); } }
     public string SourceFolderLabel => SourceFolder?.DisplayPath ?? "Chưa chọn thư mục nguồn";
     public string DestinationFolderLabel => DestinationFolder?.DisplayPath ?? "Chưa chọn thư mục đích";
-    public bool CanScan => _googleConnected && _oneDriveConnected && SourceFolder is not null && DestinationFolder is not null && !IsScanning && Stage == BackupWorkflowStage.Setup;
+    public bool CanScan => _googleConnected && SourceFolder is not null && !IsScanning && Stage == BackupWorkflowStage.Setup &&
+        (IsProductionMode || (_oneDriveConnected && DestinationFolder is not null));
     public string ValidationMessage => !_googleConnected ? "Hãy kết nối Google Drive trên trang Tài khoản."
-        : !_oneDriveConnected ? "Hãy kết nối OneDrive trên trang Tài khoản."
         : SourceFolder is null ? "Hãy chọn thư mục nguồn trên Google Drive."
+        : IsProductionMode ? "Đã sẵn sàng quét siêu dữ liệu và lập bản xem trước chỉ đọc."
+        : !_oneDriveConnected ? "Hãy kết nối OneDrive trên trang Tài khoản."
         : DestinationFolder is null ? "Hãy chọn thư mục đích trên OneDrive."
         : "Đã đủ thông tin để quét và xem trước.";
     public bool IsScanning { get => _isScanning; private set { if (SetProperty(ref _isScanning, value)) NotifyState(); } }
+    public string ScanProgressText { get => _scanProgressText; private set => SetProperty(ref _scanProgressText, value); }
+    public string? ScanErrorMessage { get => _scanErrorMessage; private set => SetProperty(ref _scanErrorMessage, value); }
+    public string TransferAvailabilityMessage => IsProductionMode
+        ? "Chưa thể bắt đầu sao lưu: bản dựng này chưa có đích lưu trữ thực. Không có tệp nào được tải xuống, xuất hoặc truyền."
+        : "Google Drive không bị thay đổi. OneDrive không bị xóa hoặc ghi đè theo mặc định.";
     public BackupPreviewViewState? Preview { get => _preview; private set => SetProperty(ref _preview, value); }
     public PreviewFilterOption SelectedFilter { get => _selectedFilter; set { if (SetProperty(ref _selectedFilter, value)) ApplyPreviewFilter(); } }
     public string PreviewSearch { get => _previewSearch; set { if (SetProperty(ref _previewSearch, value)) ApplyPreviewFilter(); } }
@@ -197,16 +264,34 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
 
     public override async Task LoadAsync(CancellationToken cancellationToken)
     {
+        if (IsProductionMode)
+        {
+            var account = _realGoogleProvider is null ? null : await _realGoogleProvider.GetConnectedAccountAsync(cancellationToken);
+            _googleConnected = account?.IsConnected == true;
+            _oneDriveConnected = false;
+            _realGoogleAccountId = account?.ProviderAccountId;
+            AccountDisplayName = account is null ? "Google Drive chưa kết nối" : account.Email ?? account.DisplayName;
+            await RestoreRealSelectionAsync(cancellationToken);
+            NotifyState();
+            return;
+        }
         var accounts = await _demoData.GetAccountsAsync(cancellationToken);
         _googleConnected = accounts.Any(account => account.ProviderId == "google-drive" && account.IsConnected);
         _oneDriveConnected = accounts.Any(account => account.ProviderId == "one-drive" && account.IsConnected);
+        AccountDisplayName = accounts.FirstOrDefault(account => account.ProviderId == "google-drive")?.DisplayName ?? "Tài khoản trình diễn";
         NotifyState();
     }
 
     private async Task SelectSourceAsync(CancellationToken cancellationToken)
     {
-        var selected = await _folderPicker.PickAsync(new FolderPickerRequest("google-drive", DemoDataService.GoogleAccountId, DemoDataService.GoogleRootId, "Chọn thư mục nguồn trên Google Drive", false), cancellationToken);
-        if (selected is not null) SourceFolder = new(selected.ProviderId, selected.AccountId, selected.FolderId, selected.DisplayPath);
+        var accountId = IsDemoMode ? DemoDataService.GoogleAccountId : _realGoogleAccountId;
+        if (string.IsNullOrWhiteSpace(accountId)) return;
+        var selected = await _folderPicker.PickAsync(new FolderPickerRequest("google-drive", accountId, "root", "Chọn thư mục nguồn trên Google Drive", false), cancellationToken);
+        if (selected is not null)
+        {
+            SourceFolder = new(selected.ProviderId, selected.AccountId, selected.FolderId, selected.DisplayPath);
+            if (IsProductionMode) await PersistRealSelectionAsync(cancellationToken);
+        }
     }
 
     private async Task SelectDestinationAsync(CancellationToken cancellationToken)
@@ -217,11 +302,28 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
 
     private async Task ScanAsync(CancellationToken cancellationToken)
     {
-        if (!CanScan || SourceFolder is null || DestinationFolder is null) return;
+        if (!CanScan || SourceFolder is null) return;
         IsScanning = true;
+        ScanErrorMessage = null;
+        Preview = null;
         try
         {
-            Preview = await _planner.BuildAsync(SourceFolder, DestinationFolder, cancellationToken);
+            if (IsProductionMode)
+            {
+                var browser = _realGoogleProvider as IStorageBrowserCapability
+                    ?? throw new InvalidOperationException("Google Drive không hỗ trợ duyệt thư mục.");
+                var progress = new Progress<SourceScanProgress>(value =>
+                    ScanProgressText = $"Đã phát hiện {value.DiscoveredItems:N0} mục; đang đọc {value.CurrentPath}.");
+                var scan = await new SourceScanner(browser).ScanAsync(SourceFolder.AccountId, SourceFolder.FolderId, cancellationToken, progress);
+                Preview = BuildRealPreview(SourceFolder.DisplayPath, scan);
+                ScanProgressText = $"Hoàn tất: {scan.FileCount:N0} tệp, {scan.FolderCount:N0} thư mục.";
+                await PersistScanSummaryAsync(scan, cancellationToken);
+            }
+            else
+            {
+                if (DestinationFolder is null) return;
+                Preview = await _planner.BuildAsync(SourceFolder, DestinationFolder, cancellationToken);
+            }
             _allPreviewItems.Clear();
             _allPreviewItems.AddRange(Preview.Items);
             SelectedFilter = PreviewFilters[0];
@@ -229,7 +331,67 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
             ApplyPreviewFilter();
             Stage = BackupWorkflowStage.Preview;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            ScanProgressText = "Đã hủy quét. Kết quả chưa hoàn tất không được dùng làm bản xem trước.";
+            throw;
+        }
+        catch (Exception exception)
+        {
+            ScanErrorMessage = exception is ProviderOperationException failure
+                ? ProviderFailureMessages.ToVietnamese(failure.Category)
+                : "Không thể hoàn tất bản quét. Không có dữ liệu Google Drive nào bị thay đổi; vui lòng thử lại.";
+            ScanProgressText = "Bản quét chưa hoàn tất.";
+        }
         finally { IsScanning = false; }
+    }
+
+    private static BackupPreviewViewState BuildRealPreview(string sourcePath, SourceScanResult scan)
+    {
+        var items = new List<PreviewItemViewModel>();
+        var exportCount = 0;
+        foreach (var scanned in scan.Items.Where(scanned => scanned.Item.Kind != StorageItemKind.Folder))
+        {
+            var item = scanned.Item;
+            var path = scanned.RelativePath.ToString();
+            if (item.Kind == StorageItemKind.Shortcut || item.MimeType == GoogleNativeExportPolicy.GoogleShortcut)
+            {
+                items.Add(new(item.ItemId, item.Name, path, null, PreviewItemCategory.Skip, "Bỏ qua lối tắt", null,
+                    "Lối tắt được bỏ qua để tránh vòng lặp; mục đích không được tự động lần theo."));
+                continue;
+            }
+            if (item.Kind == StorageItemKind.ProviderNativeFile)
+            {
+                var decision = GoogleNativeExportPolicy.Decide(item.MimeType ?? string.Empty);
+                if (!decision.IsSupported)
+                {
+                    items.Add(new(item.ItemId, item.Name, path, null, PreviewItemCategory.Unsupported, "Không hỗ trợ", null, decision.VietnameseExplanation));
+                    continue;
+                }
+                exportCount++;
+                items.Add(new(item.ItemId, item.Name, path, null, PreviewItemCategory.Warning, $"Dự kiến xuất {decision.Extension}", item.Name + decision.Extension,
+                    decision.VietnameseExplanation + " Đây mới là kế hoạch; chưa có dữ liệu nào được xuất."));
+                continue;
+            }
+            items.Add(new(item.ItemId, item.Name, path, item.Size, PreviewItemCategory.Copy, "Đủ điều kiện", item.Name,
+                item.Size is null ? "Kích thước không được Google Drive cung cấp; chưa có nội dung nào được đọc." : "Đã đọc siêu dữ liệu; chưa có nội dung nào được tải xuống."));
+        }
+
+        return new BackupPreviewViewState(
+            sourcePath,
+            "Chưa có đích lưu trữ thực",
+            scan.FolderCount,
+            scan.FileCount,
+            scan.EstimatedBytes,
+            items.Count(item => item.Category is PreviewItemCategory.Copy or PreviewItemCategory.Warning),
+            items.Count(item => item.Category == PreviewItemCategory.Skip),
+            0,
+            exportCount,
+            items.Count(item => item.Category == PreviewItemCategory.Unsupported),
+            scan.VietnameseWarnings.Count + items.Count(item => item.Category is PreviewItemCategory.Warning or PreviewItemCategory.Unsupported),
+            scan.UnknownSizeCount,
+            items,
+            scan.VietnameseWarnings);
     }
 
     private async Task StartBackupAsync(CancellationToken cancellationToken)
@@ -323,6 +485,45 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
         Stage = BackupWorkflowStage.Result;
     }
 
+    private async Task RestoreRealSelectionAsync(CancellationToken cancellationToken)
+    {
+        if (_settings is null || string.IsNullOrWhiteSpace(_realGoogleAccountId)) return;
+        var accountId = await _settings.GetAsync("backup.google.source.account", cancellationToken);
+        var folderId = await _settings.GetAsync("backup.google.source.folder", cancellationToken);
+        var displayPath = await _settings.GetAsync("backup.google.source.path", cancellationToken);
+        if (string.Equals(accountId, _realGoogleAccountId, StringComparison.Ordinal) &&
+            !string.IsNullOrWhiteSpace(folderId) && !string.IsNullOrWhiteSpace(displayPath))
+        {
+            SourceFolder = new FolderSelectionViewModel("google-drive", accountId!, folderId, displayPath);
+        }
+    }
+
+    private async Task PersistRealSelectionAsync(CancellationToken cancellationToken)
+    {
+        if (_settings is null || SourceFolder is null) return;
+        await _settings.SetAsync("backup.google.source.account", SourceFolder.AccountId, cancellationToken);
+        await _settings.SetAsync("backup.google.source.folder", SourceFolder.FolderId, cancellationToken);
+        await _settings.SetAsync("backup.google.source.path", SourceFolder.DisplayPath, cancellationToken);
+    }
+
+    private Task PersistScanSummaryAsync(SourceScanResult scan, CancellationToken cancellationToken)
+    {
+        if (_settings is null) return Task.CompletedTask;
+        var summary = JsonSerializer.Serialize(new
+        {
+            completedAtUtc = DateTimeOffset.UtcNow,
+            scan.FileCount,
+            scan.FolderCount,
+            scan.EstimatedBytes,
+            scan.UnknownSizeCount,
+            scan.NativeFileCount,
+            scan.UnsupportedNativeFileCount,
+            scan.ShortcutCount,
+            warningCount = scan.VietnameseWarnings.Count
+        });
+        return _settings.SetAsync("backup.google.last-complete-scan-summary", summary, cancellationToken);
+    }
+
     private void ApplyPreviewFilter()
     {
         var query = _allPreviewItems.AsEnumerable();
@@ -347,8 +548,10 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
     {
         OnPropertyChanged(nameof(IsSetup)); OnPropertyChanged(nameof(IsPreview)); OnPropertyChanged(nameof(IsRunning)); OnPropertyChanged(nameof(IsResult));
         OnPropertyChanged(nameof(SourceFolderLabel)); OnPropertyChanged(nameof(DestinationFolderLabel)); OnPropertyChanged(nameof(CanScan)); OnPropertyChanged(nameof(ValidationMessage));
+        OnPropertyChanged(nameof(TransferAvailabilityMessage));
         ((AsyncRelayCommand)SelectSourceCommand).NotifyCanExecuteChanged(); ((AsyncRelayCommand)SelectDestinationCommand).NotifyCanExecuteChanged();
         ((AsyncRelayCommand)ScanCommand).NotifyCanExecuteChanged(); ((AsyncRelayCommand)StartBackupCommand).NotifyCanExecuteChanged();
+        ((RelayCommand)CancelScanCommand).RaiseCanExecuteChanged();
         ((RelayCommand)PauseCommand).RaiseCanExecuteChanged(); ((RelayCommand)ResumeCommand).RaiseCanExecuteChanged();
         ((AsyncRelayCommand)CancelCommand).NotifyCanExecuteChanged(); ((AsyncRelayCommand)RetryFailedCommand).NotifyCanExecuteChanged();
     }

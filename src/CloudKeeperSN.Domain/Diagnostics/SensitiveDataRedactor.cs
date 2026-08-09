@@ -18,9 +18,9 @@ public static partial class SensitiveDataRedactor
     [GeneratedRegex("(?i)(authorization\\s*[:=]\\s*)(?:bearer\\s+)?[^\\s,;]+")]
     private static partial Regex AuthorizationHeaderRegex();
 
-    [GeneratedRegex("(?i)((?:access_token|refresh_token|client_secret|password)\\s*[:=]\\s*)[^\\s,;&]+")]
+    [GeneratedRegex("(?i)((?:access_token|refresh_token|client_secret|password|code_verifier|code_challenge)\\s*[:=]\\s*)[^\\s,;&]+")]
     private static partial Regex SensitiveKeyValueRegex();
 
-    [GeneratedRegex("(?i)([?&](?:code|access_token|refresh_token|client_secret)=)[^&\\s]+")]
+    [GeneratedRegex("(?i)([?&](?:code|access_token|refresh_token|client_secret|code_verifier|code_challenge|state)=)[^&\\s]+")]
     private static partial Regex OAuthQueryRegex();
 }

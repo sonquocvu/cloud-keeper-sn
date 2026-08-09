@@ -10,6 +10,8 @@ using CloudKeeperSN.App.Development;
 using CloudKeeperSN.App.Services;
 using CloudKeeperSN.Infrastructure;
 using CloudKeeperSN.Providers.GoogleDrive.Fakes;
+using CloudKeeperSN.Providers.GoogleDrive;
+using CloudKeeperSN.Providers.GoogleDrive.Authentication;
 using CloudKeeperSN.Providers.OneDrive.Fakes;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -30,12 +32,25 @@ public partial class App : System.Windows.Application
 
         var services = new ServiceCollection();
         services.AddCloudKeeperInfrastructure(Path.Combine(localData, "cloudkeeper.db"));
-        services.AddSingleton(DemoConfiguration.FromEnvironment());
+        var demoConfiguration = DemoConfiguration.FromEnvironment();
+        services.AddSingleton(demoConfiguration);
         services.AddSingleton<DemoWorkspace>();
         services.AddSingleton<FakeGoogleDriveProvider>();
         services.AddSingleton<FakeOneDriveProvider>();
-        services.AddSingleton<IStorageProvider>(provider => provider.GetRequiredService<FakeGoogleDriveProvider>());
-        services.AddSingleton<IStorageProvider>(provider => provider.GetRequiredService<FakeOneDriveProvider>());
+        if (demoConfiguration.IsEnabled)
+        {
+            services.AddSingleton<IStorageProvider>(provider => provider.GetRequiredService<FakeGoogleDriveProvider>());
+            services.AddSingleton<IStorageProvider>(provider => provider.GetRequiredService<FakeOneDriveProvider>());
+        }
+        else
+        {
+            services.AddSingleton(GoogleOAuthConfiguration.FromEnvironment());
+            services.AddSingleton<IGoogleOAuthClient, GoogleApisOAuthClient>();
+            services.AddSingleton<GoogleAuthenticationService>();
+            services.AddSingleton<IProviderAuthenticationService>(provider => provider.GetRequiredService<GoogleAuthenticationService>());
+            services.AddSingleton<GoogleDriveProvider>();
+            services.AddSingleton<IStorageProvider>(provider => provider.GetRequiredService<GoogleDriveProvider>());
+        }
         services.AddSingleton<DemoDataService>();
         services.AddSingleton<DemoBackupPlanner>();
         services.AddSingleton<IDemoDelay, DemoDelay>();
@@ -48,7 +63,10 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IWindowPlacementService, WindowPlacementService>();
         services.AddSingleton<DashboardViewModel>();
-        services.AddSingleton<AccountsViewModel>();
+        services.AddSingleton(provider => new AccountsViewModel(
+            provider.GetRequiredService<DemoDataService>(),
+            provider.GetRequiredService<IDialogService>(),
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IProviderAuthenticationService>()));
         services.AddSingleton<BackupViewModel>();
         services.AddSingleton<HistoryViewModel>();
         services.AddSingleton<SettingsViewModel>();
@@ -88,7 +106,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _serviceProvider?.Dispose();
+        _serviceProvider?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         base.OnExit(e);
     }
 }

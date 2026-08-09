@@ -1,0 +1,28 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="BackgroundPrimary" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}" />
+    <SolidColorBrush x:Key="BackgroundSecondary" Color="{DynamicResource {x:Static SystemColors.ControlColorKey}}" />
+    <SolidColorBrush x:Key="SurfacePrimary" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}" />
+    <SolidColorBrush x:Key="SurfaceElevated" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}" />
+    <SolidColorBrush x:Key="BorderSubtle" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
+    <SolidColorBrush x:Key="TextPrimary" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
+    <SolidColorBrush x:Key="TextSecondary" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
+    <SolidColorBrush x:Key="TextDisabled" Color="{DynamicResource {x:Static SystemColors.GrayTextColorKey}}" />
+    <SolidColorBrush x:Key="AccentPrimary" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
+    <SolidColorBrush x:Key="AccentHover" Color="{DynamicResource {x:Static SystemColors.HotTrackColorKey}}" />
+    <SolidColorBrush x:Key="AccentSoft" Color="{DynamicResource {x:Static SystemColors.ControlColorKey}}" />
+    <SolidColorBrush x:Key="Success" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
+    <SolidColorBrush x:Key="SuccessSoft" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}" />
+    <SolidColorBrush x:Key="Warning" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
+    <SolidColorBrush x:Key="WarningSoft" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}" />
+    <SolidColorBrush x:Key="Error" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
+    <SolidColorBrush x:Key="ErrorSoft" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}" />
+    <SolidColorBrush x:Key="Information" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
+    <SolidColorBrush x:Key="InformationSoft" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}" />
+    <SolidColorBrush x:Key="NavigationBackground" Color="{DynamicResource {x:Static SystemColors.ControlColorKey}}" />
+    <SolidColorBrush x:Key="NavigationHover" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
+    <SolidColorBrush x:Key="NavigationSelected" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
+    <SolidColorBrush x:Key="NavigationText" Color="{DynamicResource {x:Static SystemColors.ControlTextColorKey}}" />
+    <SolidColorBrush x:Key="NavigationTextMuted" Color="{DynamicResource {x:Static SystemColors.ControlTextColorKey}}" />
+    <SolidColorBrush x:Key="Overlay" Color="#99000000" />
+</ResourceDictionary>
