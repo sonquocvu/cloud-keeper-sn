@@ -1,5 +1,6 @@
 using CloudKeeperSN.Domain.Backup;
 using CloudKeeperSN.Domain.Scanning;
+using CloudKeeperSN.Domain.Planning;
 using CloudKeeperSN.Domain.Transfers;
 using CloudKeeperSN.Infrastructure.Persistence;
 
@@ -169,6 +170,45 @@ public sealed class SqlitePersistenceTests : IAsyncDisposable
         Assert.DoesNotContain(columns, name => name.Contains("token", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(columns, name => name.Contains("secret", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(columns, name => name.Contains("credential", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task BackupSelectionPlan_RoundTripsRulesAndReplacesPriorEditAtomically()
+    {
+        var inventory = new SqliteDriveInventoryRepository(_database, _factory);
+        var scan = InventoryRun(Guid.NewGuid());
+        await inventory.BeginAsync(scan, CancellationToken.None);
+        await inventory.CompleteAsync(scan with
+        {
+            CompletedAtUtc = DateTimeOffset.UtcNow,
+            Status = DriveInventoryRunStatus.Completed,
+            IsComplete = true
+        }, CancellationToken.None);
+        var repository = new SqliteBackupSelectionPlanRepository(_database, _factory);
+        var plan = new BackupSelectionPlan(Guid.NewGuid(), "account", "Tài liệu quan trọng", scan.ScanId,
+            DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow,
+            [new("folder", BackupSelectionRuleMode.Include, DriveInventoryItemKind.Folder, "Tài liệu")]);
+
+        await repository.SaveAsync(plan, CancellationToken.None);
+        var restored = await repository.GetByAccountAsync("account", CancellationToken.None);
+        Assert.Equal(plan.PlanId, restored!.PlanId);
+        Assert.Equal(plan.Name, restored.Name);
+        Assert.Equal(plan.SourceScanId, restored.SourceScanId);
+        Assert.Equal(plan.Rules, restored.Rules);
+
+        var edited = plan with
+        {
+            Name = "Kế hoạch đã sửa",
+            UpdatedAtUtc = DateTimeOffset.UtcNow.AddMinutes(1),
+            Rules = [new("file", BackupSelectionRuleMode.Exclude, DriveInventoryItemKind.File, "Riêng tư.txt")]
+        };
+        await repository.SaveAsync(edited, CancellationToken.None);
+        var reopened = await repository.GetByAccountAsync("account", CancellationToken.None);
+
+        Assert.Equal("Kế hoạch đã sửa", reopened!.Name);
+        var rule = Assert.Single(reopened.Rules);
+        Assert.Equal("file", rule.ItemId);
+        Assert.Equal(BackupSelectionRuleMode.Exclude, rule.Mode);
     }
 
     private async Task SeedBackupRunAsync()

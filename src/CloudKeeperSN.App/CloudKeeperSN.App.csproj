@@ -5,7 +5,7 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Assets\CloudKeeperSN.ico</ApplicationIcon>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <AssemblyName>CloudKeeperSN</AssemblyName>
     <Product>CloudKeeperSN</Product>
     <Description>Trình quét và lập kế hoạch sao lưu Google Drive chỉ đọc cho Windows.</Description>

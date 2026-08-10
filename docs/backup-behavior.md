@@ -6,6 +6,12 @@ The intended direction is Google Drive → a future destination. Google Drive is
 
 No real destination or transfer exists in this build. The start action is disabled and explains that no file has been downloaded, exported or transmitted. OneDrive transfer remains available only in clearly labelled demo mode.
 
+## Local selection plan
+
+The **Kế hoạch** page reads the latest complete SQLite inventory. A direct include rule can target a folder or individual file. Folder selection is inherited by descendants; a closer exclude rule removes a child file or subtree. Only backup-eligible non-folder items contribute to the selected-item and known-size summary. Unsupported items, shortcuts and unresolved hierarchy remain visible under **Cần kiểm tra** and are never silently counted as transferable.
+
+The saved plan contains no destination and cannot start a transfer. When a newer complete scan exists, the application evaluates the same stable-ID rules against both snapshots and reports newly inherited items, previously selected items that disappeared, and rules whose target is missing. Renames and moves retain selection when Google keeps the same file ID.
+
 ## Folder and filename handling
 
 Relative path segments are preserved in order. Empty folders will be created where the destination supports folder creation. OneDrive-invalid/control characters are replaced deterministically, trailing spaces/dots are removed, reserved device names receive a safe prefix, and overlong names receive a stable hash suffix.

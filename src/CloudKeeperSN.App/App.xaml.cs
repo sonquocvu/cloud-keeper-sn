@@ -4,6 +4,7 @@ using CloudKeeperSN.Application.Persistence;
 using CloudKeeperSN.Application.Recovery;
 using CloudKeeperSN.Application.Storage;
 using CloudKeeperSN.Application.Scanning;
+using CloudKeeperSN.Application.Planning;
 using CloudKeeperSN.App.ViewModels;
 using CloudKeeperSN.App.UI.Theming;
 using CloudKeeperSN.App.UI.Windowing;
@@ -72,6 +73,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<TransferRecoveryService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IWindowPlacementService, WindowPlacementService>();
+        services.AddSingleton<BackupSelectionPlanner>();
+        services.AddSingleton<IBackupSelectionPlanService, BackupSelectionPlanService>();
         services.AddSingleton(provider => new DashboardViewModel(
             provider.GetRequiredService<DemoDataService>(),
             demoConfiguration.IsEnabled,
@@ -99,6 +102,12 @@ public partial class App : System.Windows.Application
             demoConfiguration.IsEnabled,
             demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IDriveInventoryScanner>(),
             provider.GetRequiredService<IUiDispatcher>()));
+        services.AddSingleton(provider => new InventoryPlanViewModel(
+            demoConfiguration,
+            provider.GetRequiredService<IBackupSelectionPlanService>(),
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IProviderAuthenticationService>(),
+            demoConfiguration.IsEnabled ? null : provider.GetRequiredService<IDriveInventoryScanner>(),
+            provider.GetRequiredService<IUiDispatcher>()));
         services.AddSingleton(provider => new SettingsViewModel(
             provider.GetRequiredService<IThemeService>(),
             provider.GetRequiredService<IApplicationSettingRepository>(),
@@ -114,7 +123,8 @@ public partial class App : System.Windows.Application
             provider.GetRequiredService<AccountsViewModel>(),
             provider.GetRequiredService<BackupViewModel>(),
             provider.GetRequiredService<HistoryViewModel>(),
-            provider.GetRequiredService<SettingsViewModel>())
+            provider.GetRequiredService<SettingsViewModel>(),
+            provider.GetRequiredService<InventoryPlanViewModel>())
         {
             IsDemoMode = provider.GetRequiredService<DemoConfiguration>().IsEnabled
         });

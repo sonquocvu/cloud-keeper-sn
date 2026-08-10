@@ -189,6 +189,29 @@ public sealed class SqliteApplicationDatabase(SqliteConnectionFactory connection
 
             CREATE INDEX ix_drive_scan_runs_latest ON drive_scan_runs(provider_account_id, is_complete, completed_at_utc DESC);
             CREATE INDEX ix_drive_scan_items_path ON drive_scan_items(scan_id, display_path);
+            """),
+        (4, """
+            CREATE TABLE backup_selection_plans (
+                plan_id TEXT NOT NULL PRIMARY KEY,
+                provider_account_id TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                source_scan_id TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL,
+                FOREIGN KEY(source_scan_id) REFERENCES drive_scan_runs(scan_id)
+            );
+
+            CREATE TABLE backup_selection_rules (
+                plan_id TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                rule_mode TEXT NOT NULL,
+                item_kind TEXT NOT NULL,
+                last_known_name TEXT NOT NULL,
+                PRIMARY KEY(plan_id, item_id),
+                FOREIGN KEY(plan_id) REFERENCES backup_selection_plans(plan_id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_backup_selection_rules_plan ON backup_selection_rules(plan_id);
             """)
     ];
 

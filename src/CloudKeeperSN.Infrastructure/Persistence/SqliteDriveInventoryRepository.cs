@@ -187,6 +187,19 @@ public sealed class SqliteDriveInventoryRepository(
         return items;
     }
 
+    public async Task<IReadOnlyList<DriveInventoryItem>> GetAllItemsAsync(Guid scanId, CancellationToken cancellationToken)
+    {
+        await database.InitializeAsync(cancellationToken);
+        await using var connection = await connectionFactory.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT * FROM drive_scan_items WHERE scan_id=$scan ORDER BY display_path";
+        command.Parameters.AddWithValue("$scan", scanId.ToString());
+        var items = new List<DriveInventoryItem>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)) items.Add(ReadItem(reader));
+        return items;
+    }
+
     private static void AddItemParameters(SqliteCommand command, Guid scanId, DriveInventoryItem item)
     {
         command.Parameters.AddWithValue("$scan", scanId.ToString());

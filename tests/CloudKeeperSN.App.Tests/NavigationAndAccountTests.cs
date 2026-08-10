@@ -9,6 +9,7 @@ public sealed class NavigationAndAccountTests
     [InlineData("dashboard")]
     [InlineData("accounts")]
     [InlineData("backup")]
+    [InlineData("inventory-plan")]
     [InlineData("history")]
     [InlineData("settings")]
     public async Task Navigation_ReachesEveryPrimaryPage(string key)
@@ -32,4 +33,3 @@ public sealed class NavigationAndAccountTests
         Assert.False(environment.Accounts.GoogleDrive.DisconnectCommand.CanExecute(null));
     }
 }
-

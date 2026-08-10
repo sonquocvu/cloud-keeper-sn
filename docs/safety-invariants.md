@@ -24,5 +24,9 @@ These rules are mandatory and take priority over convenience:
 20. Shortcuts are stored as shortcut records and their targets are never recursively followed.
 21. Only a run with every page persisted and hierarchy completed may set `is_complete=1`; cancelled, failed, interrupted, and reauthentication-required runs cannot replace the latest successful snapshot.
 22. Shared drives are outside the current scan boundary and the UI/documentation must not imply complete shared-drive support.
+23. A saved backup selection is a local plan only. It must never be represented as transferred, verified, or backed up.
+24. Selection and exclusion rules use stable Google file IDs; names and reconstructed paths are display metadata only.
+25. Selection planning reads only complete local snapshots and never invokes a cloud provider, content stream, export, OneDrive, or destination-path resolver.
+26. A newer snapshot cannot silently overwrite unsaved edits or be accepted during a stale plan save; reconciliation must surface inherited additions, missing selected items, and missing rule targets.
 
 The production Google provider exposes authentication/browse/metadata/export-planning capabilities only. It has no content-read, export execution, folder-create or write capability. DPAPI credential storage, migration constraints, redaction, pagination guards, complete-scan-only persistence and tests enforce these rules. A later destination/transfer pipeline must preserve them.

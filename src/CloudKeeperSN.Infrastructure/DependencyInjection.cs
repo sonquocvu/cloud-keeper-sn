@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddSingleton<IApplicationDatabase, SqliteApplicationDatabase>();
         services.AddSingleton<IStorageAccountRepository, SqliteStorageAccountRepository>();
         services.AddSingleton<IDriveInventoryRepository, SqliteDriveInventoryRepository>();
+        services.AddSingleton<IBackupSelectionPlanRepository, SqliteBackupSelectionPlanRepository>();
         services.AddSingleton<ITransferMappingRepository, SqliteTransferMappingRepository>();
         services.AddSingleton<ITransferItemRepository, SqliteTransferItemRepository>();
         services.AddSingleton<IActivityEventRepository, SqliteActivityEventRepository>();

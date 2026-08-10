@@ -33,13 +33,19 @@ Provider SDK models must remain inside their provider assembly. Application code
 
 The infrastructure uses `Microsoft.Data.Sqlite` directly rather than EF Core. The schema is small, explicit SQL is clearer for atomic state updates, and this avoids an ORM dependency while retaining numbered migrations. Initialization enables foreign keys, WAL journaling, and a busy timeout. Each queue-item update is atomic. On startup, in-flight `Downloading`, `Uploading`, or `Verifying` items are changed to `RetryPending`; they are never marked complete during recovery.
 
-Migration 1 creates tables for accounts (metadata only), backup definitions, runs, transfer items, mappings, export decisions, verification results, retry state, Vietnamese activity events, and application settings. Migration 2 adds account email metadata. Migration 3 adds `drive_scan_runs` and `drive_scan_items`. A scan run begins incomplete, API pages are appended in bounded transactions, hierarchy paths are updated in bounded chunks, and a guarded final update publishes the run as complete. Startup changes abandoned `Scanning` rows to `Interrupted`; it never changes an earlier complete row. File contents, thumbnails, OAuth tokens, and client secrets are never stored in SQLite.
+Migration 1 creates tables for accounts (metadata only), backup definitions, runs, transfer items, mappings, export decisions, verification results, retry state, Vietnamese activity events, and application settings. Migration 2 adds account email metadata. Migration 3 adds `drive_scan_runs` and `drive_scan_items`. Migration 4 adds one local backup-selection plan per provider account plus compact include/exclude rules. A scan run begins incomplete, API pages are appended in bounded transactions, hierarchy paths are updated in bounded chunks, and a guarded final update publishes the run as complete. Startup changes abandoned `Scanning` rows to `Interrupted`; it never changes an earlier complete row. File contents, thumbnails, OAuth tokens, and client secrets are never stored in SQLite.
 
 ## Drive inventory pipeline
 
 `IDriveInventorySource` is the provider boundary for `about.get` quota metadata and paged `files.list` metadata. `DriveInventoryScanner` owns the explicit lifecycle, single-scan gate, cancellation, safe diagnostics, counters, and staging snapshot. `DriveHierarchyBuilder` resolves parent IDs iteratively with memoized paths, so duplicate names remain legal and deep or cyclic graphs cannot recurse the process stack. `IDriveInventoryRepository` is the only persistence boundary used by the scanner.
 
 The scanner keeps only stable IDs and hierarchy nodes in memory; full item metadata is written one API page at a time. `DashboardViewModel`, `BackupViewModel`, and `HistoryViewModel` subscribe to the singleton scanner and marshal state changes through `IUiDispatcher`, allowing the active page and dashboard/history to refresh without navigation or restart.
+
+## Local selection planning
+
+`BackupSelectionPlanner` evaluates explicit include/exclude rules by walking stable parent IDs. The closest rule wins: selecting a folder includes eligible descendants, while an exclusion on a child file or folder overrides the ancestor. Rules are not expanded into thousands of rows, so a newly discovered descendant can be identified as newly selected during reconciliation. Evaluation is iterative, cycle-safe and memoized.
+
+`BackupSelectionPlanService` always loads the newest complete snapshot and compares it with the plan's prior source snapshot. It reports newly inherited selections, previously selected IDs no longer present, and rule targets missing from the latest inventory. Save rechecks the latest snapshot ID to prevent a scan/save race. `InventoryPlanViewModel` preserves unsaved edits across page refresh requests and dispatches completed-scan notifications safely.
 
 ## Streaming boundary
 

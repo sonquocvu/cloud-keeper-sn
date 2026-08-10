@@ -16,6 +16,8 @@ Each API page is committed to `drive_scan_items` in its own bounded transaction.
 
 `drive_scan_runs` starts as `Scanning` with `is_complete=0`. Only after all pages and hierarchy updates succeed does one guarded transaction set status `Completed` and `is_complete=1`. Latest-summary queries select completed rows only. Cancellation, failure, revoked authorization and startup recovery keep the new row incomplete, so the previous complete snapshot stays available.
 
+The local [backup selection plan](backup-selection-plan.md) consumes only these complete snapshots. Browsing, searching and changing selection rules do not make additional Drive API calls.
+
 ## Lifecycle, retry and diagnostics
 
 The visible stages are `Idle`, `ValidatingSession`, `LoadingStorageInformation`, `Scanning`, `BuildingHierarchy`, `SavingSnapshot`, `Completed`, `Cancelled`, `Failed`, and `RequiresReauthentication`. A zero-timeout semaphore permits only one scan; cancellation flows through API calls, persistence and retry delay; busy state resets in `finally`. A retry starts a new staging scan.

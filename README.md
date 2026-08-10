@@ -17,6 +17,8 @@ Trong chế độ thực chưa có đích lưu trữ và chưa có truyền dữ
 - quét toàn bộ metadata không nằm trong thùng rác bằng `files.list` 1.000 mục/trang và đọc quota bằng `about.get`;
 - snapshot SQLite dạng staging, chỉ công bố sau khi mọi trang và cấu trúc thư mục hoàn tất; lần quét thành công trước sống sót khi hủy/lỗi/tắt ứng dụng;
 - nhận diện bằng file ID, giữ tên trùng/Unicode, phân loại tệp thường, thư mục, Google Workspace, shortcut, shared, thiếu kích thước và parent không hợp lệ;
+- trang **Kế hoạch** duyệt cây thư mục của snapshot mới nhất, tìm kiếm/lọc metadata, chọn tệp hoặc thư mục, loại trừ hậu duệ và lưu kế hoạch cục bộ;
+- quy tắc lựa chọn dùng file ID, tự đối chiếu snapshot mới và cảnh báo mục mới được kế thừa, mục biến mất hoặc quy tắc mất đích;
 - kế hoạch Google Docs → `.docx`, Sheets → `.xlsx`, Slides → `.pptx`, Drawings → `.png`; loại native khác được đánh dấu không hỗ trợ;
 - retry có exponential backoff, jitter, giới hạn, tôn trọng `Retry-After` và hủy;
 - theme sáng/tối/theo Windows/high contrast, nhãn trạng thái bằng chữ và hỗ trợ bàn phím;
@@ -77,4 +79,4 @@ Giao diện luôn hiện nhãn **Chế độ trình diễn** khi provider giả 
 
 Ngắt kết nối cố gắng revoke token và luôn xóa token cache cục bộ; không thay đổi tệp đám mây.
 
-Tài liệu: [kiến trúc](docs/architecture.md), [Drive inventory](docs/drive-inventory.md), [provider Google chỉ đọc](docs/google-drive-readonly.md), [hành vi sao lưu](docs/backup-behavior.md), [bất biến an toàn](docs/safety-invariants.md), [kiểm thử](docs/testing.md), [UI/accessibility checklist](docs/ui-readiness-checklist.md).
+Tài liệu: [kiến trúc](docs/architecture.md), [Drive inventory](docs/drive-inventory.md), [kế hoạch lựa chọn](docs/backup-selection-plan.md), [provider Google chỉ đọc](docs/google-drive-readonly.md), [hành vi sao lưu](docs/backup-behavior.md), [bất biến an toàn](docs/safety-invariants.md), [kiểm thử](docs/testing.md), [UI/accessibility checklist](docs/ui-readiness-checklist.md).

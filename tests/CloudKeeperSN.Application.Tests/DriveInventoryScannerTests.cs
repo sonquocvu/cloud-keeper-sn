@@ -260,6 +260,7 @@ public sealed class DriveInventoryScannerTests
         public Task<DriveInventoryRun?> GetLatestSuccessfulAsync(string providerAccountId, CancellationToken cancellationToken) => Task.FromResult(Latest);
         public Task<IReadOnlyList<DriveInventoryRun>> GetRecentAsync(int maximumCount, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<DriveInventoryRun>>(Runs.Values.ToArray());
         public Task<IReadOnlyList<DriveInventoryItem>> GetItemsAsync(Guid scanId, int maximumCount, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<DriveInventoryItem>>(Items.Values.ToArray());
+        public Task<IReadOnlyList<DriveInventoryItem>> GetAllItemsAsync(Guid scanId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<DriveInventoryItem>>(Items.Values.ToArray());
     }
 
     private sealed class NullDiagnostics : IProviderDiagnostics

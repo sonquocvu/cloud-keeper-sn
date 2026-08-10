@@ -1,6 +1,7 @@
 using CloudKeeperSN.Domain.Backup;
 using CloudKeeperSN.Domain.Storage;
 using CloudKeeperSN.Domain.Scanning;
+using CloudKeeperSN.Domain.Planning;
 using CloudKeeperSN.Domain.Transfers;
 
 namespace CloudKeeperSN.Application.Persistence;
@@ -28,11 +29,18 @@ public interface IDriveInventoryRepository
     Task<DriveInventoryRun?> GetLatestSuccessfulAsync(string providerAccountId, CancellationToken cancellationToken);
     Task<IReadOnlyList<DriveInventoryRun>> GetRecentAsync(int maximumCount, CancellationToken cancellationToken);
     Task<IReadOnlyList<DriveInventoryItem>> GetItemsAsync(Guid scanId, int maximumCount, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DriveInventoryItem>> GetAllItemsAsync(Guid scanId, CancellationToken cancellationToken);
 }
 
 public sealed class DriveInventoryPersistenceException : Exception
 {
     public DriveInventoryPersistenceException(string message, Exception innerException) : base(message, innerException) { }
+}
+
+public interface IBackupSelectionPlanRepository
+{
+    Task<BackupSelectionPlan?> GetByAccountAsync(string providerAccountId, CancellationToken cancellationToken);
+    Task SaveAsync(BackupSelectionPlan plan, CancellationToken cancellationToken);
 }
 
 public interface ITransferMappingRepository

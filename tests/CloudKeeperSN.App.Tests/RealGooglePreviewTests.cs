@@ -91,7 +91,7 @@ public sealed class RealGooglePreviewTests
         Assert.False(viewModel.ScanCommand.CanExecute(null));
         Assert.True(viewModel.CancelScanCommand.CanExecute(null));
         viewModel.CancelScanCommand.Execute(null);
-        await AsyncTest.UntilAsync(() => !viewModel.IsScanning);
+        await AsyncTest.UntilAsync(() => !viewModel.IsScanning && viewModel.ScanCommand.CanExecute(null));
 
         Assert.True(viewModel.ScanCommand.CanExecute(null));
         Assert.False(viewModel.CancelScanCommand.CanExecute(null));

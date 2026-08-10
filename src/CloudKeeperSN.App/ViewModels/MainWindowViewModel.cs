@@ -14,9 +14,14 @@ public sealed class MainWindowViewModel : ObservableObject
         AccountsViewModel accounts,
         BackupViewModel backup,
         HistoryViewModel history,
-        SettingsViewModel settings)
+        SettingsViewModel settings,
+        InventoryPlanViewModel? inventoryPlan = null)
     {
-        _pages = new PageViewModel[] { dashboard, accounts, backup, history, settings }
+        var pages = new List<PageViewModel> { dashboard, accounts, backup };
+        if (inventoryPlan is not null) pages.Add(inventoryPlan);
+        pages.Add(history);
+        pages.Add(settings);
+        _pages = pages
             .ToDictionary(page => page.Key, StringComparer.Ordinal);
         _currentPage = dashboard;
         NavigationItems =
@@ -24,9 +29,12 @@ public sealed class MainWindowViewModel : ObservableObject
             new("dashboard", "Tổng quan", "\uE80F", "Mở trang Tổng quan"),
             new("accounts", "Tài khoản", "\uE77B", "Mở trang Tài khoản"),
             new("backup", "Sao lưu", "\uE753", "Mở trang Sao lưu một chiều"),
+            new("inventory-plan", "Kế hoạch", "\uE8A5", "Mở kế hoạch lựa chọn Google Drive"),
             new("history", "Lịch sử", "\uE81C", "Mở trang Lịch sử"),
             new("settings", "Cài đặt", "\uE713", "Mở trang Cài đặt")
         ];
+        if (inventoryPlan is null)
+            NavigationItems.Remove(NavigationItems.Single(item => item.Key == "inventory-plan"));
         NavigateCommand = new RelayCommand(Navigate);
         dashboard.CreateBackupRequested += (_, _) => NavigateTo("backup");
         backup.OpenHistoryRequested += (_, _) => NavigateTo("history");
@@ -37,7 +45,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand NavigateCommand { get; }
     public bool IsDemoMode { get; init; }
     public string EnvironmentLabel => IsDemoMode ? "Chế độ trình diễn" : "Google Drive chỉ đọc";
-    public string VersionLabel => "Phiên bản 0.3.0";
+    public string VersionLabel => "Phiên bản 0.4.0";
 
     public PageViewModel CurrentPage
     {
