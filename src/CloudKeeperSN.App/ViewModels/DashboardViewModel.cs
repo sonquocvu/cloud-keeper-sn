@@ -178,11 +178,5 @@ public sealed class DashboardViewModel : PageViewModel, IDisposable
     }
 
     internal static string FormatBytes(long bytes)
-    {
-        string[] units = ["byte", "KB", "MB", "GB", "TB"];
-        var value = (double)bytes;
-        var unit = 0;
-        while (value >= 1024 && unit < units.Length - 1) { value /= 1024; unit++; }
-        return unit == 0 ? $"{bytes} byte" : $"{value:0.#} {units[unit]}";
-    }
+        => VietnameseNumberFormatter.FormatBytes(bytes);
 }

@@ -5,11 +5,98 @@ using CloudKeeperSN.Application.Scanning;
 using CloudKeeperSN.Application.Storage;
 using CloudKeeperSN.Domain.Scanning;
 using CloudKeeperSN.Domain.Storage;
+using System.Globalization;
 
 namespace CloudKeeperSN.App.Tests;
 
 public sealed class RealGooglePreviewTests
 {
+    [Fact]
+    public void InventorySummaryFormatsScanAndStorageValuesForPresentation()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+        try
+        {
+        var summary = new DriveInventorySummaryViewModel(
+            new DateTimeOffset(2026, 8, 10, 3, 4, 0, TimeSpan.Zero),
+            4_109, 3_766, 328, 27_058_706_432, 1, 15, 0, 31, 3_781,
+            5L * 1024 * 1024 * 1024 * 1024, 824L * 1024 * 1024 * 1024,
+            15L * 1024 * 1024 * 1024, 1_288_490_189);
+
+        Assert.Equal("4.109", summary.TotalItemsLabel);
+        Assert.Equal("3.766", summary.FileCountLabel);
+        Assert.Equal("3.781", summary.BackupEligibleCountLabel);
+        Assert.Equal("25,2 GB", summary.KnownBytesLabel);
+        Assert.Equal("5 TB", summary.StorageLimitLabel);
+        Assert.Equal("824 GB", summary.TotalUsageLabel);
+        Assert.True(summary.HasStorageInformation);
+        Assert.True(summary.HasStorageProgress);
+        Assert.InRange(summary.StorageUsagePercent, 16.09, 16.10);
+        Assert.Equal("824 GB / 5 TB (16,1%)", summary.StorageProgressLabel);
+        Assert.Contains("824 GB", summary.StorageProgressAccessibleLabel);
+        Assert.Contains("16,1%", summary.StorageProgressAccessibleLabel);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
+    }
+
+    [Fact]
+    public void InventorySummaryDoesNotPresentMissingStorageValuesAsZero()
+    {
+        var summary = new DriveInventorySummaryViewModel(
+            DateTimeOffset.UtcNow, 1, 1, 0, 0, 1, 0, 0, 0, 0,
+            null, null, null, null);
+
+        Assert.Equal("Không xác định", summary.StorageLimitLabel);
+        Assert.Equal("Không xác định", summary.TotalUsageLabel);
+        Assert.Equal("Không xác định", summary.DriveUsageLabel);
+        Assert.Equal("Không xác định", summary.TrashUsageLabel);
+        Assert.False(summary.HasStorageInformation);
+        Assert.False(summary.HasStorageProgress);
+        Assert.Equal("Không xác định", summary.StorageProgressLabel);
+        Assert.Equal("Không xác định", summary.StorageProgressAccessibleLabel);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void InventorySummaryRejectsZeroOrInvalidStorageLimit(long storageLimit)
+    {
+        var summary = new DriveInventorySummaryViewModel(
+            DateTimeOffset.UtcNow, 1, 1, 0, 1, 0, 0, 0, 0, 1,
+            storageLimit, 500, null, null);
+
+        Assert.False(summary.HasStorageProgress);
+        Assert.Equal(0, summary.StorageUsagePercent);
+        Assert.Equal("Không xác định", summary.StorageProgressLabel);
+    }
+
+    [Fact]
+    public void InventorySummaryClampsStorageProgressToValidRange()
+    {
+        var summary = new DriveInventorySummaryViewModel(
+            DateTimeOffset.UtcNow, 1, 1, 0, 1, 0, 0, 0, 0, 1,
+            1_000, 2_000, null, null);
+
+        Assert.Equal(100, summary.StorageUsagePercent);
+        Assert.EndsWith("(100%)", summary.StorageProgressLabel, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task NoSuccessfulSnapshotShowsNotStartedState()
+    {
+        var environment = await UiTestEnvironment.CreateAsync();
+        using var viewModel = Create(environment, new ProductionGoogleProvider(), new FakeInventoryScanner(), InlineUiDispatcher.Instance);
+
+        await viewModel.LoadAsync(CancellationToken.None);
+
+        Assert.Null(viewModel.InventorySummary);
+        Assert.Equal("Chưa bắt đầu quét", viewModel.ScanProgressText);
+    }
+
     [Fact]
     public async Task ProductionModeScansWholeDriveAndPublishesSummaryWithoutTransfer()
     {
@@ -28,9 +115,10 @@ public sealed class RealGooglePreviewTests
         Assert.Equal(3, viewModel.InventorySummary!.FileCount);
         Assert.Equal(2, viewModel.InventorySummary.UnknownSizeCount);
         Assert.Equal(1, viewModel.InventorySummary.GoogleWorkspaceFileCount);
-        Assert.Equal("9.8 KB", viewModel.InventorySummary.StorageLimitLabel);
+        Assert.Equal("9,8 KB", viewModel.InventorySummary.StorageLimitLabel);
         Assert.Equal("2 KB", viewModel.InventorySummary.TotalUsageLabel);
         Assert.Equal("Đã quét Google Drive thành công.", viewModel.ScanSuccessMessage);
+        Assert.Equal("Sẵn sàng quét lại", viewModel.ScanProgressText);
         Assert.False(viewModel.StartBackupCommand.CanExecute(null));
         Assert.Contains("chưa có đích lưu trữ thực", viewModel.TransferAvailabilityMessage, StringComparison.OrdinalIgnoreCase);
         Assert.True(dispatcher.InvocationCount > 0);
@@ -58,6 +146,8 @@ public sealed class RealGooglePreviewTests
         Assert.Equal(previous.FileCount, viewModel.InventorySummary!.FileCount);
         Assert.True(viewModel.ScanCommand.CanExecute(null));
         Assert.Contains("mạng", viewModel.ScanErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Sẵn sàng thử lại", viewModel.ScanProgressText, StringComparison.Ordinal);
+        Assert.Contains("kết quả quét thành công trước đó", viewModel.ScanProgressText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -70,6 +160,40 @@ public sealed class RealGooglePreviewTests
 
         Assert.False(viewModel.ScanCommand.CanExecute(null));
         Assert.Contains("kết nối Google Drive", viewModel.ValidationMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DisconnectedAccountStillRestoresLatestSuccessfulLocalSnapshot()
+    {
+        var environment = await UiTestEnvironment.CreateAsync();
+        var previous = CompletedRun();
+        var scanner = new FakeInventoryScanner { Latest = previous };
+        using var viewModel = Create(environment, new ProductionGoogleProvider(connected: false), scanner, InlineUiDispatcher.Instance);
+
+        await viewModel.LoadAsync(CancellationToken.None);
+
+        Assert.False(viewModel.ScanCommand.CanExecute(null));
+        Assert.NotNull(viewModel.InventorySummary);
+        Assert.Equal(previous.FileCount, viewModel.InventorySummary!.FileCount);
+        Assert.Equal("Sẵn sàng quét lại", viewModel.ScanProgressText);
+    }
+
+    [Fact]
+    public async Task CompletedScannerNotificationReplacesSummaryAndRaisesPropertyChange()
+    {
+        var environment = await UiTestEnvironment.CreateAsync();
+        var scanner = new FakeInventoryScanner { Latest = CompletedRun() };
+        using var viewModel = Create(environment, new ProductionGoogleProvider(), scanner, InlineUiDispatcher.Instance);
+        await viewModel.LoadAsync(CancellationToken.None);
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+        var replacement = CompletedRun() with { FileCount = 42, TotalItems = 45 };
+
+        scanner.PublishCompletion(replacement);
+
+        Assert.Equal(42, viewModel.InventorySummary!.FileCount);
+        Assert.Equal("Sẵn sàng quét lại", viewModel.ScanProgressText);
+        Assert.Contains(nameof(BackupViewModel.InventorySummary), changedProperties);
     }
 
     [Fact]
@@ -95,10 +219,28 @@ public sealed class RealGooglePreviewTests
 
         Assert.True(viewModel.ScanCommand.CanExecute(null));
         Assert.False(viewModel.CancelScanCommand.CanExecute(null));
-        Assert.Contains("hủy", viewModel.ScanProgressText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("thử lại", viewModel.ScanProgressText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(nameof(BackupViewModel.IsScanning), changedProperties);
         Assert.Contains(nameof(BackupViewModel.ScanProgressText), changedProperties);
         Assert.True(commandChanges > 0);
+    }
+
+    [Fact]
+    public async Task CancelledRetryPreservesPreviousSummaryAndShowsRetryState()
+    {
+        var environment = await UiTestEnvironment.CreateAsync();
+        var previous = CompletedRun();
+        var scanner = new FakeInventoryScanner { Latest = previous, Block = true };
+        using var viewModel = Create(environment, new ProductionGoogleProvider(), scanner, InlineUiDispatcher.Instance);
+        await viewModel.LoadAsync(CancellationToken.None);
+
+        viewModel.ScanCommand.Execute(null);
+        await scanner.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        viewModel.CancelScanCommand.Execute(null);
+        await AsyncTest.UntilAsync(() => !viewModel.IsScanning && viewModel.ScanProgressText.Contains("thử lại", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(previous.FileCount, viewModel.InventorySummary!.FileCount);
+        Assert.Contains("kết quả quét thành công trước đó", viewModel.ScanProgressText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

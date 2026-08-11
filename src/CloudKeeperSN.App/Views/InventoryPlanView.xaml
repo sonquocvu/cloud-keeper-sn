@@ -4,120 +4,274 @@
              xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
              xmlns:vm="clr-namespace:CloudKeeperSN.App.ViewModels"
              xmlns:controls="clr-namespace:CloudKeeperSN.App.Controls">
+    <UserControl.Resources>
+        <Style x:Key="PlanMetricTile" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource CornerSmall}"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
+        <Style x:Key="CompactTreeButton" TargetType="Button" BasedOn="{StaticResource TextButton}">
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style x:Key="PlanTreeItem" TargetType="TreeViewItem">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Margin" Value="0,1,0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource DefaultFocusVisual}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/></Trigger>
+                <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{DynamicResource AccentSoft}"/></Trigger>
+                <DataTrigger Binding="{Binding IsCurrentFolder}" Value="True"><Setter Property="Background" Value="{DynamicResource AccentSoft}"/></DataTrigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource TextDisabled}"/></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="PlanListItem" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/></Trigger>
+                <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{DynamicResource AccentSoft}"/></Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <Grid Margin="{StaticResource PagePadding}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <controls:InlineNotification Title="Kế hoạch cục bộ, chưa phải bản sao lưu"
-                Message="Lựa chọn chỉ được lưu trong CloudKeeperSN. Không có tệp nào được tải xuống, xuất, truyền hoặc thay đổi trên Google Drive."/>
-            <controls:InlineNotification Title="Đối chiếu snapshot mới" Message="{Binding ReconciliationMessage}" Tone="Warning" Margin="0,12,0,0"
-                Visibility="{Binding HasReconciliationMessage, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-            <Button Content="Xóa quy tắc không còn đích" Command="{Binding RemoveMissingRulesCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+            <Border Background="{DynamicResource InformationSoft}" CornerRadius="{StaticResource CornerSmall}" Padding="10">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE946;" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource Information}" Margin="0,1,9,0"
+                               ToolTip="Thông tin an toàn"/>
+                    <TextBlock Grid.Column="1" Text="Lựa chọn chỉ được lưu trên máy. Chưa có tệp nào được tải xuống hoặc chuyển sang OneDrive."
+                               Style="{StaticResource CaptionText}" TextWrapping="Wrap"/>
+                </Grid>
+            </Border>
+            <controls:InlineNotification Title="Đối chiếu ảnh chụp mới" Message="{Binding ReconciliationMessage}" Tone="Warning" Margin="0,8,0,0"
+                                         Visibility="{Binding HasReconciliationMessage, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            <Button Content="Xóa quy tắc không còn đích" Command="{Binding RemoveMissingRulesCommand}" HorizontalAlignment="Left" Margin="0,6,0,0"
                     Visibility="{Binding HasMissingRules, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-            <controls:LoadingIndicator Message="Đang mở danh mục Google Drive…" Margin="0,12,0,0"
-                Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-            <controls:EmptyState Title="Chưa thể mở danh mục" Message="{Binding StatusMessage}" IconGlyph="\uE8B7" Margin="0,16,0,0"
-                Visibility="{Binding HasNoSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            <controls:LoadingIndicator Message="Đang tải ảnh chụp và kế hoạch cục bộ…" Margin="0,10,0,0"
+                                       Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </StackPanel>
 
-        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,16,0,16"
+        <controls:EmptyState Grid.Row="1" Grid.RowSpan="3" Title="Chưa có dữ liệu Google Drive để lựa chọn"
+                             Message="{Binding StatusMessage}" IconGlyph="&#xE8B7;" Margin="0,16,0,0"
+                             Visibility="{Binding HasNoSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="16" Margin="0,12,0,12"
                 Visibility="{Binding HasSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="Tên kế hoạch" Style="{StaticResource CaptionText}"/>
-                    <TextBox Text="{Binding PlanName, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,18,0" MaxLength="120"
-                             automation:AutomationProperties.Name="Tên kế hoạch sao lưu cục bộ"/>
-                    <TextBlock Text="{Binding SnapshotLabel, StringFormat=Snapshot: {0}}" Style="{StaticResource CaptionText}" Margin="0,7,0,0"/>
-                    <TextBlock Text="Có thay đổi chưa lưu" Foreground="{DynamicResource Warning}" Style="{StaticResource CaptionText}" Margin="0,4,0,0"
-                               Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </StackPanel>
-                <UniformGrid Grid.Column="1" Columns="3" Margin="0,0,18,0">
-                    <StackPanel><TextBlock Text="Mục đã chọn" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding SelectedItemCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
-                    <StackPanel><TextBlock Text="Dung lượng biết trước" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding KnownBytesLabel}" FontSize="18" FontWeight="SemiBold"/></StackPanel>
-                    <StackPanel><TextBlock Text="Cần kiểm tra" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding ReviewItemCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
-                </UniformGrid>
-                <StackPanel Grid.Column="2" HorizontalAlignment="Right">
-                    <Button Content="_Lưu kế hoạch" Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}"/>
-                    <Button Content="Bỏ toàn bộ lựa chọn" Command="{Binding ClearSelectionCommand}" Margin="0,8,0,0"/>
-                </StackPanel>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition MinWidth="260"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Tên kế hoạch" Style="{StaticResource CaptionText}"/>
+                        <TextBox Text="{Binding PlanName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,16,0" MaxLength="120"
+                                 automation:AutomationProperties.Name="Tên kế hoạch sao lưu cục bộ"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" MinWidth="250" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding AccountIdentityLabel}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding AccountIdentityLabel}" automation:AutomationProperties.Name="Tài khoản Google của kế hoạch"/>
+                        <TextBlock Text="{Binding SnapshotLabel, StringFormat=Ảnh chụp: {0}}" Style="{StaticResource CaptionText}" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Grid>
+                <controls:ResponsiveUniformGrid Grid.Row="1" MinimumItemWidth="145" MaximumColumns="4" HorizontalSpacing="8" VerticalSpacing="8" Margin="0,12,0,0">
+                    <Border Style="{StaticResource PlanMetricTile}" automation:AutomationProperties.Name="{Binding SelectedItemCountLabel, StringFormat=Mục đã chọn: {0}}">
+                        <StackPanel><TextBlock Text="Mục đã chọn" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding SelectedItemCountLabel}" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,0"/></StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource PlanMetricTile}" automation:AutomationProperties.Name="{Binding KnownBytesLabel, StringFormat=Dung lượng đã xác định: {0}}">
+                        <StackPanel><TextBlock Text="Dung lượng đã xác định" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding KnownBytesLabel}" FontSize="20" FontWeight="SemiBold" Margin="0,4,0,0"/></StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource PlanMetricTile}" automation:AutomationProperties.Name="{Binding UnknownSizeCountLabel, StringFormat=Chưa rõ dung lượng: {0}}">
+                        <StackPanel><TextBlock Text="Chưa rõ dung lượng" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding UnknownSizeCountLabel}" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,0"/></StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource PlanMetricTile}" automation:AutomationProperties.Name="{Binding SelectedReviewItemCountLabel, StringFormat=Cần kiểm tra: {0}}">
+                        <StackPanel><TextBlock Text="Cần kiểm tra" Style="{StaticResource CaptionText}"/><StackPanel Orientation="Horizontal" Margin="0,4,0,0"><TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource Warning}" Margin="0,0,7,0"/><TextBlock Text="{Binding SelectedReviewItemCountLabel}" FontSize="22" FontWeight="SemiBold"/></StackPanel></StackPanel>
+                    </Border>
+                </controls:ResponsiveUniformGrid>
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" Visibility="{Binding HasSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="5*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="6*"/></Grid.ColumnDefinitions>
-            <Border Style="{StaticResource Card}">
+        <controls:AdaptiveTwoPanePanel Grid.Row="2" Breakpoint="900" PrimaryFraction="0.34" NarrowPrimaryFraction="0.4" Spacing="16"
+                                       Visibility="{Binding HasSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border Style="{StaticResource Card}" Padding="16" MinWidth="260">
                 <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                    <StackPanel Margin="0,0,0,12">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <StackPanel Margin="0,0,0,10">
                         <TextBlock Text="Cấu trúc thư mục" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
-                        <TextBlock Text="Chọn thư mục để bao gồm hậu duệ; bỏ chọn một mục con để tạo ngoại lệ." Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        <TextBlock Text="Chọn thư mục để xem nội dung. Đánh dấu thư mục để đưa các mục con vào kế hoạch."
+                                   Style="{StaticResource CaptionText}" Margin="0,3,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
-                    <TreeView Grid.Row="1" ItemsSource="{Binding TreeRoots}" VirtualizingStackPanel.IsVirtualizing="True"
+                    <TreeView Grid.Row="1" ItemsSource="{Binding TreeRoots}" Background="Transparent" Foreground="{DynamicResource TextPrimary}"
+                              BorderThickness="0" ItemContainerStyle="{StaticResource PlanTreeItem}"
+                              ScrollViewer.CanContentScroll="True" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"
                               automation:AutomationProperties.Name="Cấu trúc danh mục Google Drive">
                         <TreeView.Resources>
                             <HierarchicalDataTemplate DataType="{x:Type vm:InventoryItemNodeViewModel}" ItemsSource="{Binding Children}">
-                                <StackPanel Orientation="Horizontal">
+                                <Grid ToolTip="{Binding Name}">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
                                     <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                               Visibility="{Binding IsSelectable, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                              VerticalAlignment="Center" Margin="0,0,6,0"
-                                              automation:AutomationProperties.Name="{Binding Name, StringFormat=Chọn {0}}"/>
-                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="310"/>
-                                </StackPanel>
+                                              VerticalAlignment="Center" Margin="2,0,5,0"
+                                              automation:AutomationProperties.Name="{Binding Name, StringFormat=Đưa {0} vào kế hoạch}"/>
+                                    <Button Grid.Column="1" Style="{StaticResource CompactTreeButton}" Command="{Binding DataContext.BrowseFolderCommand, RelativeSource={RelativeSource AncestorType=TreeView}}" CommandParameter="{Binding}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding IconGlyph}" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource AccentPrimary}" Margin="0,0,6,0"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="2" Text="Đang xem" Style="{StaticResource CaptionText}" Margin="6,0,2,0"
+                                                       Visibility="{Binding IsCurrentFolder, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                        </Grid>
+                                    </Button>
+                                </Grid>
                             </HierarchicalDataTemplate>
                         </TreeView.Resources>
                     </TreeView>
-                </Grid>
-            </Border>
-
-            <Border Grid.Column="2" Style="{StaticResource Card}">
-                <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                    <TextBlock Text="Tìm kiếm và lọc" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
-                    <Grid Grid.Row="1" Margin="0,12,0,12">
-                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="190"/></Grid.ColumnDefinitions>
-                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,10,0"
-                                 automation:AutomationProperties.Name="Tìm theo tên hoặc đường dẫn"/>
-                        <ComboBox Grid.Column="1" ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" DisplayMemberPath="Label"
-                                  automation:AutomationProperties.Name="Lọc danh mục"/>
-                    </Grid>
-                    <ListBox Grid.Row="2" ItemsSource="{Binding SearchResults}" VirtualizingStackPanel.IsVirtualizing="True"
-                             VirtualizingStackPanel.VirtualizationMode="Recycling" automation:AutomationProperties.Name="Kết quả danh mục">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1" Padding="6,9">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
-                                        <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" Margin="0,3,8,0"
-                                                  automation:AutomationProperties.Name="{Binding Name, StringFormat=Chọn {0}}"/>
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding DisplayPath}" Style="{StaticResource CaptionText}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding EligibilityLabel}" Style="{StaticResource SupportingText}" TextWrapping="Wrap" Margin="0,3,8,0"/>
-                                            <TextBlock Text="{Binding SelectionNote}" Style="{StaticResource CaptionText}" Margin="0,2,0,0"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2" HorizontalAlignment="Right">
-                                            <TextBlock Text="{Binding TypeLabel}" Style="{StaticResource CaptionText}" TextAlignment="Right"/>
-                                            <TextBlock Text="{Binding SizeLabel}" Style="{StaticResource CaptionText}" TextAlignment="Right" Margin="0,4,0,0"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                    <StackPanel Grid.Row="3" Margin="0,12,0,0">
-                        <TextBlock Text="{Binding SelectedFolderCount, StringFormat=Thư mục được bao gồm: {0:N0}}" Style="{StaticResource CaptionText}"/>
-                        <TextBlock Text="{Binding BackupEligibleItemCount, StringFormat=Mục đủ điều kiện sao lưu tương lai: {0:N0}}" Style="{StaticResource CaptionText}"/>
-                        <TextBlock Text="{Binding UnknownSizeCount, StringFormat=Mục đã chọn chưa rõ kích thước: {0:N0}}" Style="{StaticResource CaptionText}"/>
-                        <TextBlock Text="{Binding SelectedReviewItemCount, StringFormat=Mục đã chọn nhưng cần kiểm tra: {0:N0}}" Style="{StaticResource CaptionText}"/>
-                        <TextBlock Text="{Binding SaveMessage}" Foreground="{DynamicResource Success}" TextWrapping="Wrap" Margin="0,7,0,0" automation:AutomationProperties.LiveSetting="Polite"/>
+                    <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                        <TextBlock Text="Không có thư mục để hiển thị." Style="{StaticResource CaptionText}"
+                                   Visibility="{Binding HasNoTreeRoots, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <TextBlock Text="{Binding TreeErrorMessage}" Foreground="{DynamicResource Warning}" TextWrapping="Wrap"
+                                   Visibility="{Binding TreeErrorMessage, Converter={StaticResource NullToVisibilityConverter}}"
+                                   automation:AutomationProperties.LiveSetting="Polite"/>
                     </StackPanel>
                 </Grid>
             </Border>
-        </Grid>
+
+            <Border Style="{StaticResource Card}" Padding="16" MinWidth="500">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Tìm kiếm và lọc" Style="{StaticResource SectionTitleText}" automation:AutomationProperties.HeadingLevel="Level2"/>
+                    <Grid Grid.Row="1" Margin="0,10,0,10">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="190"/></Grid.ColumnDefinitions>
+                        <Grid Margin="0,0,10,0">
+                            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Padding="34,7,36,7"
+                                     automation:AutomationProperties.Name="Tìm theo tên tệp hoặc thư mục"/>
+                            <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource TextSecondary}" Margin="11,0,0,0"
+                                       VerticalAlignment="Center" IsHitTestVisible="False"/>
+                            <TextBlock Text="{Binding SearchPlaceholder}" Style="{StaticResource SupportingText}" Margin="34,0,36,0"
+                                       VerticalAlignment="Center" IsHitTestVisible="False"
+                                       Visibility="{Binding HasSearchText, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                            <Button Content="&#xE711;" Command="{Binding ClearSearchCommand}" Style="{StaticResource IconButton}" Width="32" MinHeight="30"
+                                    Padding="0" HorizontalAlignment="Right" ToolTip="Xóa tìm kiếm"
+                                    Visibility="{Binding HasSearchText, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                    automation:AutomationProperties.Name="Xóa nội dung tìm kiếm"/>
+                        </Grid>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Bộ lọc" Style="{StaticResource CaptionText}" Margin="0,0,0,3"/>
+                            <ComboBox ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" DisplayMemberPath="Label"
+                                      automation:AutomationProperties.Name="Bộ lọc danh mục"/>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Grid.Row="2" Margin="0,0,0,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8B7;" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource AccentPrimary}" Margin="0,0,7,0"/>
+                                <TextBlock Text="{Binding CurrentLocationLabel}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding CurrentLocationLabel}" automation:AutomationProperties.Name="Vị trí đang xem"/>
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding VisibleItemCountLabel, StringFormat={}{0} mục}" Style="{StaticResource CaptionText}" Margin="12,0,0,0"
+                                       Visibility="{Binding IsSearching, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                            <TextBlock Grid.Column="1" Text="Đang tìm kiếm…" Style="{StaticResource CaptionText}" Margin="12,0,0,0"
+                                       Visibility="{Binding IsSearching, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        </Grid>
+                        <TextBlock Text="{Binding SearchErrorMessage}" Foreground="{DynamicResource Error}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   automation:AutomationProperties.LiveSetting="Polite"/>
+                    </StackPanel>
+                    <Grid Grid.Row="3">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <Border Background="{DynamicResource BackgroundSecondary}" CornerRadius="{StaticResource CornerSmall}" Padding="8,6">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="34"/><ColumnDefinition/><ColumnDefinition Width="130"/><ColumnDefinition Width="105"/><ColumnDefinition Width="155"/></Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="1" Text="Tên" Style="{StaticResource CaptionText}" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="2" Text="Loại" Style="{StaticResource CaptionText}" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="3" Text="Dung lượng" Style="{StaticResource CaptionText}" FontWeight="SemiBold" TextAlignment="Right"/>
+                                <TextBlock Grid.Column="4" Text="Trạng thái" Style="{StaticResource CaptionText}" FontWeight="SemiBold" Margin="12,0,0,0"/>
+                            </Grid>
+                        </Border>
+                        <ListBox Grid.Row="1" ItemsSource="{Binding SearchResults}" ItemContainerStyle="{StaticResource PlanListItem}"
+                                 Background="Transparent" ScrollViewer.CanContentScroll="True" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                 KeyboardNavigation.DirectionalNavigation="Continue" automation:AutomationProperties.Name="Nội dung thư mục hoặc kết quả tìm kiếm">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1" Padding="8,8"
+                                            ToolTip="{Binding EligibilityLabel}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="34"/><ColumnDefinition/><ColumnDefinition Width="130"/><ColumnDefinition Width="105"/><ColumnDefinition Width="155"/></Grid.ColumnDefinitions>
+                                            <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="1,0,8,0"
+                                                      automation:AutomationProperties.Name="{Binding Name, StringFormat=Đưa {0} vào kế hoạch}"/>
+                                            <Grid Grid.Column="1" Margin="0,0,10,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding IconGlyph}" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource AccentPrimary}" Margin="0,1,7,0"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                                                    <TextBlock Text="{Binding DisplayPath}" Style="{StaticResource CaptionText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayPath}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                            <TextBlock Grid.Column="2" Text="{Binding TypeLabel}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding TypeLabel}"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding SizeLabel}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" TextAlignment="Right"/>
+                                            <controls:StatusBadge Grid.Column="4" Text="{Binding ItemStatus.Text}" Tone="{Binding ItemStatus.Tone}" Margin="12,0,0,0"
+                                                                  HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                                  Visibility="{Binding HasItemStatus, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Border Grid.Row="1" Background="{DynamicResource SurfacePrimary}" Padding="16"
+                                Visibility="{Binding HasNoSearchResults, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="20" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding EmptyResultsMessage}" Style="{StaticResource SupportingText}" TextAlignment="Center" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+        </controls:AdaptiveTwoPanePanel>
+
+        <Border Grid.Row="3" Style="{StaticResource Card}" Padding="12" Margin="0,12,0,0"
+                Visibility="{Binding HasSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+                <controls:ResponsiveUniformGrid MinimumItemWidth="125" MaximumColumns="5" HorizontalSpacing="8" VerticalSpacing="6">
+                    <TextBlock Text="{Binding SelectedFolderCountLabel, StringFormat=Thư mục: {0}}" Style="{StaticResource CaptionText}"/>
+                    <TextBlock Text="{Binding SelectedFileCountLabel, StringFormat=Tệp: {0}}" Style="{StaticResource CaptionText}"/>
+                    <TextBlock Text="{Binding SelectedWorkspaceItemCountLabel, StringFormat=Google Workspace: {0}}" Style="{StaticResource CaptionText}"/>
+                    <TextBlock Text="{Binding UnknownSizeCountLabel, StringFormat=Chưa rõ dung lượng: {0}}" Style="{StaticResource CaptionText}"/>
+                    <TextBlock Text="{Binding SelectedReviewItemCountLabel, StringFormat=Cần kiểm tra: {0}}" Style="{StaticResource CaptionText}"/>
+                </controls:ResponsiveUniformGrid>
+                <TextBlock Text="Đang cập nhật tổng hợp…" Style="{StaticResource CaptionText}" Margin="0,6,0,0"
+                           Visibility="{Binding IsSummaryUpdating, Converter={StaticResource BooleanToVisibilityConverter}}"
+                           automation:AutomationProperties.LiveSetting="Polite"/>
+                <WrapPanel Margin="0,9,0,0">
+                    <controls:StatusBadge Text="{Binding SaveStateStatus.Text}" Tone="{Binding SaveStateStatus.Tone}" Margin="0,0,10,0"
+                                          automation:AutomationProperties.Name="{Binding SaveStateStatus.Text, StringFormat=Trạng thái kế hoạch: {0}}"/>
+                    <Button Content="{Binding SaveActionText}" Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
+                            automation:AutomationProperties.HelpText="Lưu tên và quy tắc lựa chọn vào máy"/>
+                    <Button Content="Bỏ toàn bộ lựa chọn" Command="{Binding ClearSelectionCommand}"/>
+                </WrapPanel>
+                <TextBlock Text="{Binding SaveMessage}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,6,0,0"
+                           automation:AutomationProperties.LiveSetting="Polite"/>
+                <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

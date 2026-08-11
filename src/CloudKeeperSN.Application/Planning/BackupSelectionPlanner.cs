@@ -43,7 +43,14 @@ public sealed record BackupPlanWorkspace(
 public sealed class BackupSelectionPlanner
 {
     public BackupSelectionEvaluation Evaluate(BackupSelectionPlan plan, IReadOnlyList<DriveInventoryItem> items)
+        => Evaluate(plan, items, CancellationToken.None);
+
+    public BackupSelectionEvaluation Evaluate(
+        BackupSelectionPlan plan,
+        IReadOnlyList<DriveInventoryItem> items,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var byId = items.GroupBy(item => item.FileId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         var rules = plan.Rules.GroupBy(rule => rule.ItemId, StringComparer.Ordinal)
@@ -60,7 +67,8 @@ public sealed class BackupSelectionPlanner
 
         foreach (var item in byId.Values)
         {
-            var applied = FindNearestRule(item, byId, rules, resolvedRules);
+            cancellationToken.ThrowIfCancellationRequested();
+            var applied = FindNearestRule(item, byId, rules, resolvedRules, cancellationToken);
             var covered = applied?.Mode == BackupSelectionRuleMode.Include;
             var requiresReview = item.Location == DriveInventoryLocation.Unresolved ||
                 (item.Kind != DriveInventoryItemKind.Folder && !item.IsBackupEligible);
@@ -104,7 +112,8 @@ public sealed class BackupSelectionPlanner
         DriveInventoryItem start,
         IReadOnlyDictionary<string, DriveInventoryItem> byId,
         IReadOnlyDictionary<string, BackupSelectionRule> rules,
-        IDictionary<string, BackupSelectionRule?> resolvedRules)
+        IDictionary<string, BackupSelectionRule?> resolvedRules,
+        CancellationToken cancellationToken)
     {
         if (resolvedRules.TryGetValue(start.FileId, out var cached)) return cached;
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -113,6 +122,7 @@ public sealed class BackupSelectionPlanner
         BackupSelectionRule? result = null;
         while (visited.Add(current.FileId))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             chain.Add(current.FileId);
             if (rules.TryGetValue(current.FileId, out var rule)) { result = rule; break; }
             if (resolvedRules.TryGetValue(current.FileId, out result)) break;
@@ -129,6 +139,11 @@ public interface IBackupSelectionPlanService
     Task<BackupPlanWorkspace?> LoadAsync(string providerAccountId, CancellationToken cancellationToken);
     Task<BackupSelectionPlan> SaveAsync(BackupSelectionPlan plan, Guid latestScanId, CancellationToken cancellationToken);
     BackupSelectionEvaluation Evaluate(BackupSelectionPlan plan, IReadOnlyList<DriveInventoryItem> items);
+    Task<BackupSelectionEvaluation> EvaluateAsync(
+        BackupSelectionPlan plan,
+        IReadOnlyList<DriveInventoryItem> items,
+        CancellationToken cancellationToken) =>
+        Task.Run(() => Evaluate(plan, items), cancellationToken);
 }
 
 public sealed class BackupSelectionPlanSnapshotChangedException : Exception
@@ -168,4 +183,10 @@ public sealed class BackupSelectionPlanService(
 
     public BackupSelectionEvaluation Evaluate(BackupSelectionPlan plan, IReadOnlyList<DriveInventoryItem> items) =>
         planner.Evaluate(plan, items);
+
+    public Task<BackupSelectionEvaluation> EvaluateAsync(
+        BackupSelectionPlan plan,
+        IReadOnlyList<DriveInventoryItem> items,
+        CancellationToken cancellationToken) =>
+        Task.Run(() => planner.Evaluate(plan, items, cancellationToken), cancellationToken);
 }

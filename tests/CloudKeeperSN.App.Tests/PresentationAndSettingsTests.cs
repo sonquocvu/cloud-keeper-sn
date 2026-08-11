@@ -3,11 +3,103 @@ using CloudKeeperSN.App.Presentation;
 using CloudKeeperSN.App.UI.Theming;
 using CloudKeeperSN.App.UI.Windowing;
 using CloudKeeperSN.Domain.Transfers;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Xml.Linq;
 
 namespace CloudKeeperSN.App.Tests;
 
 public sealed class PresentationAndSettingsTests
 {
+    [Fact]
+    public void ScanSummarySemanticResourcesExistInLightAndDarkThemes()
+    {
+        string[] requiredKeys =
+        [
+            "AccentSoft", "BackgroundSecondary", "BorderSubtle", "Information", "InformationSoft", "SurfacePrimary",
+            "Success", "SuccessSoft", "TextPrimary", "TextSecondary", "Warning", "WarningSoft"
+        ];
+
+        foreach (var theme in new[] { "LightTheme.xaml", "DarkTheme.xaml" })
+        {
+            var document = XDocument.Load(RepositoryFile("src", "CloudKeeperSN.App", "UI", "Themes", theme));
+            XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+            var keys = document.Root!.Elements()
+                .Select(element => (string?)element.Attribute(x + "Key"))
+                .Where(key => key is not null)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (var key in requiredKeys)
+                Assert.Contains(key, keys);
+        }
+    }
+
+    [Fact]
+    public void ScanSummaryProgressBindsReadOnlyPercentageOneWay()
+    {
+        var document = XDocument.Load(RepositoryFile("src", "CloudKeeperSN.App", "Views", "BackupView.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var progress = document.Descendants(presentation + "ProgressBar")
+            .Single(element => ((string?)element.Attribute("Value"))?.Contains("StorageUsagePercent", StringComparison.Ordinal) == true);
+
+        var binding = (string)progress.Attribute("Value")!;
+        Assert.Contains("Mode=OneWay", binding, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ScanSummaryUsesResponsiveEqualWidthTileLayouts()
+    {
+        var document = XDocument.Load(RepositoryFile("src", "CloudKeeperSN.App", "Views", "BackupView.xaml"));
+        var panels = document.Descendants()
+            .Where(element => element.Name.LocalName == "ResponsiveUniformGrid")
+            .ToArray();
+
+        Assert.Contains(panels, panel => (string?)panel.Attribute("MaximumColumns") == "5" &&
+                                          (string?)panel.Attribute("MinimumItemWidth") == "150");
+        Assert.Contains(panels, panel => (string?)panel.Attribute("MaximumColumns") == "4" &&
+                                          (string?)panel.Attribute("MinimumItemWidth") == "170");
+    }
+
+    [Fact]
+    public void BackupPlanPageKeepsSemanticMetricsResponsivePanesAndVirtualization()
+    {
+        var document = XDocument.Load(RepositoryFile("src", "CloudKeeperSN.App", "Views", "InventoryPlanView.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var controls = document.Descendants().ToArray();
+
+        Assert.Contains(controls, element => element.Name.LocalName == "AdaptiveTwoPanePanel" &&
+                                             (string?)element.Attribute("Breakpoint") == "900");
+        Assert.DoesNotContain(controls, element => element.Name == presentation + "ScrollViewer");
+
+        var itemList = controls.Single(element => element.Name == presentation + "ListBox" &&
+            (string?)element.Attribute("ItemsSource") == "{Binding SearchResults}");
+        Assert.Equal("True", (string?)itemList.Attribute("VirtualizingStackPanel.IsVirtualizing"));
+        Assert.Equal("Recycling", (string?)itemList.Attribute("VirtualizingStackPanel.VirtualizationMode"));
+        Assert.Equal("True", (string?)itemList.Attribute("ScrollViewer.CanContentScroll"));
+
+        var reviewMetric = controls.Single(element => element.Name == presentation + "Border" &&
+            (string?)element.Attribute("Style") == "{StaticResource PlanMetricTile}" &&
+            element.Descendants(presentation + "TextBlock").Any(text => (string?)text.Attribute("Text") == "Cần kiểm tra") &&
+            element.Descendants(presentation + "TextBlock").Any(text => ((string?)text.Attribute("Text"))?.Contains("SelectedReviewItemCountLabel", StringComparison.Ordinal) == true));
+        Assert.DoesNotContain(reviewMetric.Descendants().Attributes("Text"), attribute => attribute.Value.Contains("BackupEligibleItemCount", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BackupPlanPageUsesThemedControlsWithoutRawWhiteSurfaces()
+    {
+        var path = RepositoryFile("src", "CloudKeeperSN.App", "Views", "InventoryPlanView.xaml");
+        var source = File.ReadAllText(path);
+        var document = XDocument.Parse(source);
+
+        Assert.DoesNotContain("Background=\"White\"", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("#FFFFFF", source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("DynamicResource SurfacePrimary", source, StringComparison.Ordinal);
+        Assert.Contains("DynamicResource BackgroundSecondary", source, StringComparison.Ordinal);
+        Assert.Contains(document.Descendants(), element => element.Name.LocalName == "ComboBox");
+        Assert.Contains(document.Descendants(), element => element.Name.LocalName == "TreeView" &&
+                                                        (string?)element.Attribute("Background") == "Transparent");
+    }
+
     [Fact]
     public void InternalStatesMapToNaturalVietnamese()
     {
@@ -81,4 +173,12 @@ public sealed class PresentationAndSettingsTests
         Assert.Equal(first.Workspace.Runs.Select(run => run.Id), second.Workspace.Runs.Select(run => run.Id));
         Assert.Equal(first.Workspace.Runs.Select(run => run.Status), second.Workspace.Runs.Select(run => run.Status));
     }
+
+    private static string RepositoryFile(params string[] segments)
+    {
+        var testDirectory = Path.GetDirectoryName(CurrentSourceFile())!;
+        return Path.GetFullPath(Path.Combine([testDirectory, "..", "..", .. segments]));
+    }
+
+    private static string CurrentSourceFile([CallerFilePath] string path = "") => path;
 }

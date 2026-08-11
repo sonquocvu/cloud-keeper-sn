@@ -107,11 +107,33 @@ public sealed record DriveInventorySummaryViewModel(
     long? TrashUsageBytes)
 {
     public string CompletedLabel => CompletedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+    public string TotalItemsLabel => VietnameseNumberFormatter.FormatInteger(TotalItems);
+    public string FileCountLabel => VietnameseNumberFormatter.FormatInteger(FileCount);
+    public string FolderCountLabel => VietnameseNumberFormatter.FormatInteger(FolderCount);
+    public string GoogleWorkspaceFileCountLabel => VietnameseNumberFormatter.FormatInteger(GoogleWorkspaceFileCount);
+    public string UnknownSizeCountLabel => VietnameseNumberFormatter.FormatInteger(UnknownSizeCount);
+    public string UnresolvedCountLabel => VietnameseNumberFormatter.FormatInteger(UnresolvedCount);
+    public string BackupEligibleCountLabel => VietnameseNumberFormatter.FormatInteger(BackupEligibleCount);
     public string KnownBytesLabel => DashboardViewModel.FormatBytes(KnownBytes);
-    public string StorageLimitLabel => StorageLimitBytes is { } value ? DashboardViewModel.FormatBytes(value) : "Không giới hạn/không có thông tin";
-    public string TotalUsageLabel => TotalUsageBytes is { } value ? DashboardViewModel.FormatBytes(value) : "Không có thông tin";
-    public string DriveUsageLabel => DriveUsageBytes is { } value ? DashboardViewModel.FormatBytes(value) : "Không có thông tin";
-    public string TrashUsageLabel => TrashUsageBytes is { } value ? DashboardViewModel.FormatBytes(value) : "Không có thông tin";
+    public string StorageLimitLabel => FormatOptionalBytes(StorageLimitBytes);
+    public string TotalUsageLabel => FormatOptionalBytes(TotalUsageBytes);
+    public string DriveUsageLabel => FormatOptionalBytes(DriveUsageBytes);
+    public string TrashUsageLabel => FormatOptionalBytes(TrashUsageBytes);
+    public bool HasStorageInformation => StorageLimitBytes is >= 0 || TotalUsageBytes is >= 0 || DriveUsageBytes is >= 0 || TrashUsageBytes is >= 0;
+    public bool HasStorageProgress => StorageLimitBytes is > 0 && TotalUsageBytes is >= 0;
+    public double StorageUsagePercent => HasStorageProgress
+        ? Math.Clamp(TotalUsageBytes!.Value * 100d / StorageLimitBytes!.Value, 0d, 100d)
+        : 0d;
+    public string StorageProgressLabel => HasStorageProgress
+        ? $"{TotalUsageLabel} / {StorageLimitLabel} ({VietnameseNumberFormatter.FormatPercentage(StorageUsagePercent)})"
+        : "Không xác định";
+    public string StorageProgressAccessibleLabel => HasStorageProgress
+        ? $"Đã sử dụng {TotalUsageLabel} trên {StorageLimitLabel}, {VietnameseNumberFormatter.FormatPercentage(StorageUsagePercent)}"
+        : "Không xác định";
+
+    private static string FormatOptionalBytes(long? value) => value is >= 0
+        ? DashboardViewModel.FormatBytes(value.Value)
+        : "Không xác định";
 }
 
 public sealed class BackupViewModel : PageViewModel, IDisposable
@@ -149,7 +171,7 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
     private int _retryCount;
     private BackupResultViewModel? _result;
     private string _accountDisplayName = "Google Drive";
-    private string _scanProgressText = "Chưa bắt đầu quét.";
+    private string _scanProgressText = "Chưa bắt đầu quét";
     private string? _scanErrorMessage;
     private string? _scanSuccessMessage;
     private DriveInventorySummaryViewModel? _inventorySummary;
@@ -304,8 +326,17 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
             _oneDriveConnected = false;
             AccountDisplayName = account is null ? "Google Drive chưa kết nối" : account.Email ?? account.DisplayName;
             SourceFolder = account is null ? null : new FolderSelectionViewModel("google-drive", account.ProviderAccountId, "root", "Drive của tôi");
-            if (account is not null && _inventoryScanner is not null)
-                ApplyInventorySummary(await _inventoryScanner.GetLatestSuccessfulAsync(account.ProviderAccountId, cancellationToken));
+            if (_inventoryScanner is not null)
+            {
+                var latest = account is not null
+                    ? await _inventoryScanner.GetLatestSuccessfulAsync(account.ProviderAccountId, cancellationToken)
+                    : (await _inventoryScanner.GetRecentAsync(500, cancellationToken))
+                        .Where(run => run.IsComplete && run.Status == DriveInventoryRunStatus.Completed && run.CompletedAtUtc.HasValue)
+                        .OrderByDescending(run => run.CompletedAtUtc)
+                        .FirstOrDefault();
+                ApplyInventorySummary(latest);
+            }
+            RefreshIdleScanProgress();
             NotifyState();
             return;
         }
@@ -344,7 +375,7 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
                 if (_inventoryScanner is null) throw new InvalidOperationException("Dịch vụ quét Google Drive chưa sẵn sàng.");
                 var scan = await _inventoryScanner.ScanAsync(cancellationToken);
                 ApplyInventorySummary(scan);
-                ScanProgressText = $"Quét hoàn tất: {scan.TotalItems:N0} mục.";
+                ScanProgressText = "Sẵn sàng quét lại";
                 ScanSuccessMessage = "Đã quét Google Drive thành công.";
                 return;
             }
@@ -376,7 +407,11 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
                     : "Không thể hoàn tất bản quét. Không có dữ liệu Google Drive nào bị thay đổi; vui lòng thử lại.";
             ScanProgressText = "Bản quét chưa hoàn tất.";
         }
-        finally { IsScanning = false; }
+        finally
+        {
+            IsScanning = false;
+            RefreshIdleScanProgress();
+        }
     }
 
     private void InventoryScannerStateChanged(DriveInventoryScanState state) =>
@@ -385,17 +420,19 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
     private void ApplyInventoryScannerState(DriveInventoryScanState state)
     {
         IsScanning = state.IsBusy;
-        ScanProgressText = state.VietnameseMessage;
+        if (state.IsBusy) ScanProgressText = state.VietnameseMessage;
         if (state.Status == DriveInventoryScanStatus.Completed && state.LastSuccessfulRun is not null)
         {
             ApplyInventorySummary(state.LastSuccessfulRun);
             ScanSuccessMessage = "Đã quét Google Drive thành công.";
             ScanErrorMessage = null;
+            RefreshIdleScanProgress();
         }
         else if (state.Status is DriveInventoryScanStatus.Failed or DriveInventoryScanStatus.RequiresReauthentication or DriveInventoryScanStatus.Cancelled)
         {
             ScanErrorMessage = state.VietnameseMessage;
             ScanSuccessMessage = null;
+            RefreshIdleScanProgress();
         }
     }
 
@@ -407,6 +444,20 @@ public sealed class BackupViewModel : PageViewModel, IDisposable
             run.GoogleWorkspaceFileCount, run.ShortcutCount, run.UnresolvedCount, run.BackupEligibleCount,
             run.StorageInformation?.StorageLimitBytes, run.StorageInformation?.TotalUsageBytes,
             run.StorageInformation?.DriveUsageBytes, run.StorageInformation?.TrashUsageBytes);
+    }
+
+    private void RefreshIdleScanProgress()
+    {
+        if (!IsProductionMode || IsScanning) return;
+        ScanProgressText = _inventoryScanner?.State.Status switch
+        {
+            DriveInventoryScanStatus.Failed or DriveInventoryScanStatus.RequiresReauthentication or DriveInventoryScanStatus.Cancelled
+                when HasInventorySummary => "Sẵn sàng thử lại. Kết quả quét thành công trước đó vẫn được giữ.",
+            DriveInventoryScanStatus.Failed or DriveInventoryScanStatus.RequiresReauthentication or DriveInventoryScanStatus.Cancelled
+                => "Lần quét chưa hoàn tất. Sẵn sàng thử lại.",
+            _ when HasInventorySummary => "Sẵn sàng quét lại",
+            _ => "Chưa bắt đầu quét"
+        };
     }
 
     private async Task StartBackupAsync(CancellationToken cancellationToken)

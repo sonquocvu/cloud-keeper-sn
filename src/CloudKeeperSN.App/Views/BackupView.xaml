@@ -2,6 +2,27 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
              xmlns:controls="clr-namespace:CloudKeeperSN.App.Controls">
+    <UserControl.Resources>
+        <Style x:Key="PrimaryScanMetric" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource CornerSmall}"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="MinHeight" Value="104"/>
+        </Style>
+        <Style x:Key="ScanDetailTile" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource CornerSmall}"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
+        <Style x:Key="ScanDetailWarningTile" TargetType="Border" BasedOn="{StaticResource ScanDetailTile}">
+            <Setter Property="Background" Value="{DynamicResource WarningSoft}"/>
+        </Style>
+    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Background="{DynamicResource SurfacePrimary}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1" Padding="32,12">
@@ -69,31 +90,119 @@
                     <controls:InlineNotification Title="Quét hoàn tất" Message="{Binding ScanSuccessMessage}" Tone="Success" Margin="0,14,0,0"
                                                  Visibility="{Binding ScanSuccessMessage, Converter={StaticResource NullToVisibilityConverter}}"/>
                     <Border Style="{StaticResource Card}" Margin="0,20,0,0"
-                            Visibility="{Binding HasInventorySummary, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <StackPanel>
-                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="Lần quét gần nhất" Style="{StaticResource SectionTitleText}"/>
-                                <TextBlock Grid.Column="1" Text="{Binding InventorySummary.CompletedLabel}" Style="{StaticResource CaptionText}" VerticalAlignment="Center"/>
-                            </Grid>
-                            <UniformGrid Columns="5" Margin="0,18,0,0">
-                                <StackPanel><TextBlock Text="Tệp" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.FileCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
-                                <StackPanel><TextBlock Text="Thư mục" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.FolderCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
-                                <StackPanel><TextBlock Text="Tệp Google Workspace" Style="{StaticResource CaptionText}" TextWrapping="Wrap"/><TextBlock Text="{Binding InventorySummary.GoogleWorkspaceFileCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
-                                <StackPanel><TextBlock Text="Chưa rõ kích thước" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.UnknownSizeCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
-                                <StackPanel><TextBlock Text="Mục cần kiểm tra" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.UnresolvedCount}" FontSize="22" FontWeight="SemiBold"/></StackPanel>
-                            </UniformGrid>
-                            <WrapPanel Margin="0,16,0,0">
-                                <TextBlock Text="{Binding InventorySummary.KnownBytesLabel, StringFormat=Tổng dung lượng đã xác định: {0}}" Style="{StaticResource SupportingText}" Margin="0,0,24,0"/>
-                                <TextBlock Text="{Binding InventorySummary.BackupEligibleCount, StringFormat=Đủ điều kiện sao lưu trong tương lai: {0:N0} mục}" Style="{StaticResource SupportingText}"/>
-                            </WrapPanel>
-                            <WrapPanel Margin="0,8,0,0">
-                                <TextBlock Text="{Binding InventorySummary.TotalUsageLabel, StringFormat=Tổng dung lượng đã dùng: {0}}" Style="{StaticResource CaptionText}" Margin="0,0,24,0"/>
-                                <TextBlock Text="{Binding InventorySummary.StorageLimitLabel, StringFormat=Giới hạn lưu trữ: {0}}" Style="{StaticResource CaptionText}" Margin="0,0,24,0"/>
-                                <TextBlock Text="{Binding InventorySummary.DriveUsageLabel, StringFormat=Google Drive: {0}}" Style="{StaticResource CaptionText}" Margin="0,0,24,0"/>
-                                <TextBlock Text="{Binding InventorySummary.TrashUsageLabel, StringFormat=Thùng rác: {0}}" Style="{StaticResource CaptionText}"/>
-                            </WrapPanel>
-                            <TextBlock Text="CloudKeeperSN chỉ đọc thông tin tệp. Không có dữ liệu nào trên Google Drive bị thay đổi." Style="{StaticResource CaptionText}" Margin="0,14,0,0"/>
-                        </StackPanel>
+                            Visibility="{Binding IsProductionMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid>
+                            <controls:EmptyState Title="Chưa có lần quét thành công"
+                                                 Message="Hãy kết nối Google Drive và bắt đầu quét siêu dữ liệu. Không có nội dung tệp nào được tải xuống."
+                                                 IconGlyph="&#xE81C;" ActionText="Bắt đầu quét" ActionCommand="{Binding ScanCommand}"
+                                                 Visibility="{Binding HasInventorySummary, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+
+                            <StackPanel Visibility="{Binding HasInventorySummary, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="Lần quét gần nhất" Style="{StaticResource SectionTitleText}"
+                                                   automation:AutomationProperties.HeadingLevel="Level2"/>
+                                        <controls:StatusBadge Text="Hoàn tất" Tone="Success" Margin="12,0,0,0"
+                                                              automation:AutomationProperties.Name="Trạng thái lần quét: Hoàn tất"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                                ToolTip="Thời điểm hoàn tất lần quét siêu dữ liệu gần nhất">
+                                        <TextBlock Text="&#xE823;" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource TextSecondary}"
+                                                   Margin="0,0,7,0" automation:AutomationProperties.Name="Thời gian hoàn tất"/>
+                                        <TextBlock Text="{Binding InventorySummary.CompletedLabel}" Style="{StaticResource SupportingText}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Border BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1" Margin="0,16,0,0"/>
+
+                                <TextBlock Text="Tổng quan lần quét" Style="{StaticResource CardTitleText}" Margin="0,16,0,4"
+                                           automation:AutomationProperties.HeadingLevel="Level3"/>
+                                <UniformGrid Columns="3" Margin="-4,4,-4,0">
+                                    <Border Style="{StaticResource PrimaryScanMetric}"
+                                            automation:AutomationProperties.Name="{Binding InventorySummary.TotalItemsLabel, StringFormat=Tổng số mục: {0}}">
+                                        <StackPanel>
+                                            <TextBlock Text="Tổng số mục" Style="{StaticResource CaptionText}"/>
+                                            <TextBlock Text="{Binding InventorySummary.TotalItemsLabel, StringFormat={}{0} mục}" FontSize="28" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource PrimaryScanMetric}" ToolTip="Tổng kích thước của các mục mà Google Drive cung cấp kích thước; không phải dung lượng tài khoản."
+                                            automation:AutomationProperties.Name="{Binding InventorySummary.KnownBytesLabel, StringFormat=Dung lượng đã xác định: {0}}">
+                                        <StackPanel>
+                                            <TextBlock Text="Dung lượng đã xác định" Style="{StaticResource CaptionText}"/>
+                                            <TextBlock Text="{Binding InventorySummary.KnownBytesLabel}" FontSize="28" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource PrimaryScanMetric}"
+                                            automation:AutomationProperties.Name="{Binding InventorySummary.BackupEligibleCountLabel, StringFormat=Đủ điều kiện sao lưu: {0} mục}">
+                                        <StackPanel>
+                                            <TextBlock Text="Đủ điều kiện sao lưu" Style="{StaticResource CaptionText}"/>
+                                            <TextBlock Text="{Binding InventorySummary.BackupEligibleCountLabel, StringFormat={}{0} mục}" FontSize="28" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+
+                                <TextBlock Text="Chi tiết mục" Style="{StaticResource CardTitleText}" Margin="0,16,0,10"
+                                           automation:AutomationProperties.HeadingLevel="Level3"/>
+                                <controls:ResponsiveUniformGrid MinimumItemWidth="150" MaximumColumns="5" HorizontalSpacing="8" VerticalSpacing="8">
+                                    <Border Style="{StaticResource ScanDetailTile}" automation:AutomationProperties.Name="{Binding InventorySummary.FileCountLabel, StringFormat=Tệp: {0}}">
+                                        <StackPanel><TextBlock Text="Tệp" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.FileCountLabel}" FontSize="22" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource ScanDetailTile}" automation:AutomationProperties.Name="{Binding InventorySummary.FolderCountLabel, StringFormat=Thư mục: {0}}">
+                                        <StackPanel><TextBlock Text="Thư mục" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.FolderCountLabel}" FontSize="22" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource ScanDetailTile}" automation:AutomationProperties.Name="{Binding InventorySummary.GoogleWorkspaceFileCountLabel, StringFormat=Google Workspace: {0}}">
+                                        <StackPanel><TextBlock Text="Google Workspace" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.GoogleWorkspaceFileCountLabel}" FontSize="22" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource ScanDetailTile}" automation:AutomationProperties.Name="{Binding InventorySummary.UnknownSizeCountLabel, StringFormat=Chưa rõ kích thước: {0}}">
+                                        <StackPanel><TextBlock Text="Chưa rõ kích thước" Style="{StaticResource CaptionText}"/><StackPanel Orientation="Horizontal" Margin="0,5,0,0"><TextBlock Text="&#xE946;" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource Information}" Margin="0,0,7,0"/><TextBlock Text="{Binding InventorySummary.UnknownSizeCountLabel}" FontSize="22" FontWeight="SemiBold"/></StackPanel></StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource ScanDetailWarningTile}" automation:AutomationProperties.Name="{Binding InventorySummary.UnresolvedCountLabel, StringFormat=Cần kiểm tra: {0}}">
+                                        <StackPanel><TextBlock Text="Cần kiểm tra" Style="{StaticResource CaptionText}"/><StackPanel Orientation="Horizontal" Margin="0,5,0,0"><TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource Warning}" Margin="0,0,7,0"/><TextBlock Text="{Binding InventorySummary.UnresolvedCountLabel}" FontSize="22" FontWeight="SemiBold"/></StackPanel></StackPanel>
+                                    </Border>
+                                </controls:ResponsiveUniformGrid>
+
+                                <Border Background="{DynamicResource BackgroundSecondary}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1"
+                                        CornerRadius="{StaticResource CornerSmall}" Padding="12" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Dung lượng tài khoản Google" Style="{StaticResource CardTitleText}"
+                                                   automation:AutomationProperties.HeadingLevel="Level3"/>
+                                        <TextBlock Text="Dung lượng tài khoản là số liệu hạn mức của Google và có thể khác dung lượng đã xác định trong lần quét."
+                                                   Style="{StaticResource CaptionText}" Margin="0,3,0,8"/>
+                                        <controls:ResponsiveUniformGrid MinimumItemWidth="170" MaximumColumns="4" HorizontalSpacing="8" VerticalSpacing="6">
+                                            <StackPanel><TextBlock Text="Đã sử dụng" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.TotalUsageLabel}" FontWeight="SemiBold" Margin="0,3,0,0"/></StackPanel>
+                                            <StackPanel><TextBlock Text="Giới hạn lưu trữ" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.StorageLimitLabel}" FontWeight="SemiBold" Margin="0,3,0,0"/></StackPanel>
+                                            <StackPanel><TextBlock Text="Google Drive" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.DriveUsageLabel}" FontWeight="SemiBold" Margin="0,3,0,0"/></StackPanel>
+                                            <StackPanel><TextBlock Text="Thùng rác" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding InventorySummary.TrashUsageLabel}" FontWeight="SemiBold" Margin="0,3,0,0"/></StackPanel>
+                                        </controls:ResponsiveUniformGrid>
+                                        <TextBlock Text="Thông tin hạn mức lưu trữ hiện không khả dụng."
+                                                   Style="{StaticResource CaptionText}" Margin="0,4,0,0"
+                                                   Visibility="{Binding InventorySummary.HasStorageInformation, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                                        <StackPanel Margin="0,6,0,0" Visibility="{Binding InventorySummary.HasStorageProgress, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <Grid Margin="0,0,0,5">
+                                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="Mức sử dụng tài khoản" Style="{StaticResource CaptionText}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding InventorySummary.StorageProgressLabel}" Style="{StaticResource CaptionText}" FontWeight="SemiBold" Margin="12,0,0,0"/>
+                                            </Grid>
+                                            <ProgressBar Value="{Binding InventorySummary.StorageUsagePercent, Mode=OneWay}" Maximum="100" Height="10"
+                                                         Background="{DynamicResource SurfacePrimary}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1"
+                                                         automation:AutomationProperties.Name="Dung lượng tài khoản Google đã sử dụng"
+                                                         automation:AutomationProperties.HelpText="{Binding InventorySummary.StorageProgressAccessibleLabel}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{DynamicResource InformationSoft}" CornerRadius="{StaticResource CornerSmall}" Padding="12" Margin="0,12,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE946;" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource Information}" Margin="0,1,9,0"
+                                                   ToolTip="Thông tin an toàn"/>
+                                        <TextBlock Grid.Column="1" Text="CloudKeeperSN chỉ đọc thông tin tệp. Không có dữ liệu nào trên Google Drive bị thay đổi."
+                                                   Style="{StaticResource CaptionText}" TextWrapping="Wrap"/>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
                     </Border>
                 </StackPanel>
 
